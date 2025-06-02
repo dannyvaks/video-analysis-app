@@ -30,7 +30,7 @@ const App: React.FC = () => {
     video: null,
     detections: [],
     currentDetectionIndex: 0,
-    detectionMode: DetectionMode.ALL_VEHICLES, // Default to ALL_VEHICLES
+    detectionMode: DetectionMode.ALL_VEHICLES,
     modelLoaded: false,
     isProcessing: false,
     processingProgress: null,
@@ -116,7 +116,7 @@ const App: React.FC = () => {
               isManualCorrection: d.isManualCorrection,
               processedAt: d.processedAt
             })),
-            currentStep: 'review', // This is crucial - transitions to review phase
+            currentStep: 'review',
             isProcessing: false,
             processingProgress: null
           }));
@@ -143,7 +143,6 @@ const App: React.FC = () => {
         
       } catch (wsError) {
         console.warn('WebSocket connection failed:', wsError);
-        // Don't fail initialization if WebSocket fails
       }
 
       // Check model status
@@ -157,7 +156,6 @@ const App: React.FC = () => {
         }
       } catch (modelError) {
         console.warn('Model status check failed:', modelError);
-        // Assume model is loaded for now
         setAppState(prev => ({ ...prev, modelLoaded: true }));
       }
 
@@ -288,7 +286,6 @@ const App: React.FC = () => {
   }, []);
 
   const handleExport = useCallback(() => {
-    // Export is handled by the ExportInterface component
     console.log('✅ Export completed');
   }, []);
 
@@ -307,7 +304,6 @@ const App: React.FC = () => {
     } else if (error?.code === 'VIDEO_PROCESSING_FAILED' && uploadedFilePath) {
       processVideo(uploadedFilePath);
     } else {
-      // Reset to upload step for other errors
       setAppState(prev => ({
         ...prev,
         currentStep: 'upload',
@@ -327,8 +323,8 @@ const App: React.FC = () => {
       video: null,
       detections: [],
       currentDetectionIndex: 0,
-      detectionMode: appState.detectionMode, // Keep the detection mode preference
-      modelLoaded: appState.modelLoaded, // Keep model loaded
+      detectionMode: appState.detectionMode,
+      modelLoaded: appState.modelLoaded,
       isProcessing: false,
       processingProgress: null,
       modelLoadingProgress: null
@@ -337,81 +333,11 @@ const App: React.FC = () => {
     setUploadedFilePath(null);
   }, [appState.detectionMode, appState.modelLoaded]);
 
-  const handleResumeFromExcel = useCallback(async (videoFile: File, excelData: any) => {
-    try {
-      setError(null);
-      
-      // Upload the video file first
-      const uploadResult = await uploadVideoFile(videoFile);
-      
-      // Convert to our VideoMetadata format
-      const metadata: VideoMetadata = {
-        filename: uploadResult.filename,
-        duration: uploadResult.duration,
-        width: uploadResult.width,
-        height: uploadResult.height,
-        fps: uploadResult.fps,
-        frameCount: uploadResult.frameCount,
-        fileSize: uploadResult.fileSize,
-        uploadedAt: uploadResult.uploadedAt
-      };
-
-      // Parse the Excel data back to detections
-      const detections: Detection[] = excelData.detections.map((row: any, index: number) => ({
-        id: row.ID || `detection_${index}`,
-        timestamp: row.Timestamp || '00:00:00',
-        frameNumber: row['Frame Number'] || 0,
-        frameImageData: '', // We don't store images in Excel, will need to re-extract
-        boundingBox: {
-          x: row['Bounding Box X'] || 0,
-          y: row['Bounding Box Y'] || 0,
-          width: row['Bounding Box Width'] || 0,
-          height: row['Bounding Box Height'] || 0
-        },
-        modelSuggestions: [{
-          type: row['Detected Class'] || 'unknown',
-          confidence: row.Confidence || 0
-        }],
-        userChoice: row['User Choice'] || null,
-        isManualLabel: row['Manual Label'] === 'Yes',
-        isManualCorrection: row['Manual Correction'] === 'Yes',
-        processedAt: row['Processed At'] || new Date().toISOString()
-      }));
-
-      // Set the app state to review mode with the loaded data
-      setAppState(prev => ({
-        ...prev,
-        video: metadata,
-        detections: detections,
-        currentStep: 'review',
-        currentDetectionIndex: 0,
-        isProcessing: false,
-        processingProgress: null
-      }));
-
-      // Store file path for potential re-processing
-      setUploadedFilePath(uploadResult.file_path);
-
-      console.log(`✅ Resumed analysis with ${detections.length} detections`);
-      
-    } catch (err) {
-      const error: AppError = {
-        code: 'RESUME_FAILED',
-        message: 'Failed to resume from Excel file',
-        details: err,
-        timestamp: new Date().toISOString(),
-        recoverable: true
-      };
-      setError(error);
-    }
-  }, []);
-
   // Fix the resume handler
   const handleResumeSuccess = (data: any) => {
     console.log('📥 Resume data received:', data);
     
     try {
-      // Ensure we have the expected data structure
       if (!data.video || !data.detections) {
         throw new Error('Invalid resume data structure');
       }
@@ -456,12 +382,7 @@ const App: React.FC = () => {
   // Show model loading screen if model is not ready
   if (!appState.modelLoaded && !error) {
     return (
-      <div className="min-h-screen relative overflow-hidden">
-        {/* Background */}
-        <div className="fixed inset-0 z-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900"></div>
-        </div>
-        
+      <div className="min-h-screen bg-gray-50">
         <Header 
           currentStep={appState.currentStep}
           onStartOver={handleStartOver}
@@ -469,8 +390,8 @@ const App: React.FC = () => {
           onDetectionModeChange={handleDetectionModeChange}
         />
         
-        <div className="relative z-10 flex items-center justify-center min-h-screen">
-          <div className="card">
+        <div className="container-center py-12">
+          <div className="card max-w-md mx-auto">
             <div className="card-body">
               <ModelLoader progress={appState.modelLoadingProgress} />
             </div>
@@ -483,12 +404,7 @@ const App: React.FC = () => {
   // Show error screen
   if (error) {
     return (
-      <div className="min-h-screen relative overflow-hidden">
-        {/* Background */}
-        <div className="fixed inset-0 z-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900"></div>
-        </div>
-        
+      <div className="min-h-screen bg-gray-50">
         <Header 
           currentStep={appState.currentStep}
           onStartOver={handleStartOver}
@@ -496,8 +412,8 @@ const App: React.FC = () => {
           onDetectionModeChange={handleDetectionModeChange}
         />
         
-        <div className="relative z-10 flex items-center justify-center min-h-screen">
-          <div className="card max-w-md w-full">
+        <div className="container-center py-12">
+          <div className="card max-w-md mx-auto">
             <div className="card-body">
               <ErrorBoundary 
                 error={error} 
@@ -512,30 +428,8 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
-      {/* Enhanced Background with Particles */}
-      <div className="fixed inset-0 z-0">
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900"></div>
-        <div className="absolute inset-0 bg-gradient-to-tr from-blue-600/20 via-transparent to-emerald-400/20"></div>
-        
-        {/* Floating Particles */}
-        <div className="absolute inset-0 overflow-hidden">
-          {[...Array(20)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute w-2 h-2 bg-white/10 rounded-full animate-pulse"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                animationDelay: `${Math.random() * 3}s`,
-                animationDuration: `${3 + Math.random() * 4}s`
-              }}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Enhanced Header */}
+    <div className="min-h-screen bg-gray-50">
+      {/* Clean Header */}
       <Header 
         currentStep={appState.currentStep}
         onStartOver={handleStartOver}
@@ -543,28 +437,69 @@ const App: React.FC = () => {
         onDetectionModeChange={handleDetectionModeChange}
       />
 
-      {/* Enhanced Main Content */}
-      <main className="relative z-10">
+      {/* Main Content */}
+      <main>
         
-        {/* Upload Step - Enhanced */}
+        {/* Upload Step */}
         {appState.currentStep === 'upload' && (
-          <div className="fade-in">
-            <VideoUpload 
-              onVideoUpload={handleVideoUpload}
-              detectionMode={appState.detectionMode}
-              onResumeFromExcel={handleResumeFromExcel}
-            />
-            
-            {/* Enhanced Resume Section */}
-            <div className="container-narrow py-8">
-              <div className="text-center">
+          <div className="container-center py-12">
+            <div className="fade-in">
+              {/* Page Header */}
+              <div className="text-center mb-12">
+                <div className="status-badge success mx-auto mb-6">
+                  <span className="mr-2">🎯</span>
+                  AI Detection Engine Ready
+                </div>
+                
+                <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+                  Upload Video for Smart Analysis
+                </h1>
+                
+                <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+                  Our advanced YOLOv8m AI will analyze your video frame by frame, 
+                  detecting and classifying vehicles with <strong>88% accuracy</strong>.
+                </p>
+              </div>
+
+              {/* Features Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                <div className="stat-card text-center">
+                  <div className="text-3xl mb-3">⚡</div>
+                  <h3 className="font-semibold text-gray-900 mb-2">Lightning Fast</h3>
+                  <p className="text-sm text-gray-600">GPU-accelerated inference</p>
+                  <div className="mt-2 text-xs text-blue-600 font-medium">~15-25 FPS</div>
+                </div>
+                
+                <div className="stat-card text-center">
+                  <div className="text-3xl mb-3">🎯</div>
+                  <h3 className="font-semibold text-gray-900 mb-2">High Accuracy</h3>
+                  <p className="text-sm text-gray-600">YOLOv8m model precision</p>
+                  <div className="mt-2 text-xs text-emerald-600 font-medium">88% F1 Score</div>
+                </div>
+                
+                <div className="stat-card text-center">
+                  <div className="text-3xl mb-3">📊</div>
+                  <h3 className="font-semibold text-gray-900 mb-2">Rich Reports</h3>
+                  <p className="text-sm text-gray-600">Comprehensive Excel exports</p>
+                  <div className="mt-2 text-xs text-purple-600 font-medium">Charts & Stats</div>
+                </div>
+              </div>
+
+              {/* Upload Component */}
+              <VideoUpload 
+                onVideoUpload={handleVideoUpload}
+                detectionMode={appState.detectionMode}
+              />
+              
+              {/* Resume Section */}
+              <div className="text-center mt-8">
                 <div className="card card-compact inline-block">
-                  <div className="p-6">
+                  <div className="p-4">
                     <div className="flex items-center space-x-4">
-                      <div className="text-3xl">📁</div>
+                      <div className="text-2xl">📁</div>
                       <div className="text-left">
-                        <div className="font-semibold text-gray-900">Continue Previous Work?</div>
-                        <div className="text-sm text-gray-600">Resume from a previous Excel export</div>
+                        <div className="font-medium text-gray-900">Continue Previous Work?</div>
+                        <div className="text-sm text-gray-600">Resume from Excel export</div>
                       </div>
                       <button
                         onClick={() => setShowResumeModal(true)}
@@ -580,133 +515,129 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* Processing Step - Enhanced */}
+        {/* Processing Step */}
         {appState.currentStep === 'processing' && (
-          <div className="container-narrow py-12 fade-in">
-            <div className="text-center mb-12">
-              <div className="inline-flex items-center space-x-3 px-6 py-3 bg-white/10 backdrop-blur-xl text-white rounded-full border border-white/20 mb-8">
-                <div className="w-3 h-3 bg-emerald-400 rounded-full animate-pulse"></div>
-                <span className="font-medium">AI Processing Active</span>
+          <div className="container-center py-12">
+            <div className="fade-in">
+              <div className="text-center mb-12">
+                <div className="status-badge info mx-auto mb-6">
+                  <span className="mr-2">🔄</span>
+                  AI Processing Active
+                </div>
+                
+                <h2 className="text-4xl font-bold text-gray-900 mb-6">
+                  Analyzing Your Video
+                </h2>
+                <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+                  Our AI is processing your video frame by frame, detecting and classifying vehicles
+                </p>
               </div>
               
-              <h2 className="text-4xl md:text-6xl font-bold text-white mb-6">
-                🔍 Analyzing Your Video
-              </h2>
-              <p className="text-xl text-white/80 max-w-2xl mx-auto">
-                Our advanced AI is processing your video frame by frame, 
-                detecting and classifying vehicles with precision
-              </p>
-            </div>
-            
-            <div className="card scale-in">
-              <div className="card-body">
-                <VideoPlayer 
-                  video={appState.video}
-                  isProcessing={true}
-                  processingProgress={appState.processingProgress}
-                />
-                
-                {/* Enhanced Progress Display */}
-                {appState.processingProgress && (
-                  <div className="mt-8 space-y-4">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium text-gray-900">
-                        {appState.processingProgress.status}
-                      </span>
-                      <span className="text-gray-600">
-                        {appState.processingProgress.currentFrame} / {appState.processingProgress.totalFrames} frames
-                      </span>
+              <div className="card max-w-4xl mx-auto">
+                <div className="card-body">
+                  <VideoPlayer 
+                    video={appState.video}
+                    isProcessing={true}
+                    processingProgress={appState.processingProgress}
+                  />
+                  
+                  {/* Progress Display */}
+                  {appState.processingProgress && (
+                    <div className="mt-8 space-y-4">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium text-gray-900">
+                          {appState.processingProgress.status}
+                        </span>
+                        <span className="text-gray-600">
+                          {appState.processingProgress.currentFrame} / {appState.processingProgress.totalFrames} frames
+                        </span>
+                      </div>
+                      
+                      <div className="progress-container">
+                        <div 
+                          className="progress-bar"
+                          style={{ width: `${appState.processingProgress.percentage}%` }}
+                        />
+                      </div>
+                      
+                      <div className="text-center">
+                        <p className="text-gray-600">{appState.processingProgress.message}</p>
+                      </div>
                     </div>
-                    
-                    <div className="progress-container">
-                      <div 
-                        className="progress-bar"
-                        style={{ width: `${appState.processingProgress.percentage}%` }}
-                      />
-                    </div>
-                    
-                    <div className="text-center">
-                      <p className="text-gray-600">{appState.processingProgress.message}</p>
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Review Step - Enhanced Layout */}
+        {/* Review Step */}
         {appState.currentStep === 'review' && (
-          <div className="container-wide py-12 fade-in">
-            <div className="text-center mb-12">
-              <div className="inline-flex items-center space-x-3 px-6 py-3 bg-white/10 backdrop-blur-xl text-white rounded-full border border-white/20 mb-8">
-                <span className="text-emerald-400">✓</span>
-                <span className="font-medium">Analysis Complete</span>
-              </div>
-              
-              <h2 className="text-4xl md:text-6xl font-bold text-white mb-6">
-                ✅ Review Detections
-              </h2>
-              <p className="text-xl text-white/80 max-w-3xl mx-auto">
-                Verify and refine the AI detections to ensure maximum accuracy. 
-                Your expertise helps perfect the results.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
-              {/* Main Detection Review - Enhanced */}
-              <div className="xl:col-span-3">
-                <div className="card">
-                  <div className="card-body">
-                    <DetectionReview
-                      detections={appState.detections}
-                      currentIndex={appState.currentDetectionIndex}
-                      onDetectionChoice={handleDetectionChoice}
-                      onIndexChange={(index) => setAppState(prev => ({ ...prev, currentDetectionIndex: index }))}
-                    />
-                  </div>
+          <div className="container-wide py-12">
+            <div className="fade-in">
+              <div className="text-center mb-12">
+                <div className="status-badge success mx-auto mb-6">
+                  <span className="mr-2">✅</span>
+                  Analysis Complete
                 </div>
+                
+                <h2 className="text-4xl font-bold text-gray-900 mb-6">
+                  Review Detections
+                </h2>
+                <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+                  Verify and refine the AI detections to ensure maximum accuracy
+                </p>
               </div>
-              
-              {/* Enhanced Sidebar */}
-              <div className="xl:col-span-1 space-y-6">
-                {/* Statistics Panel - Enhanced */}
-                <div className="card">
-                  <div className="card-header">
-                    <div className="flex items-center space-x-3">
-                      <span className="text-2xl">📊</span>
-                      <div>
-                        <h3 className="font-bold text-gray-900">Live Statistics</h3>
-                        <p className="text-xs text-gray-600">Real-time analysis metrics</p>
-                      </div>
+
+              <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+                {/* Main Detection Review */}
+                <div className="xl:col-span-3">
+                  <div className="card">
+                    <div className="card-body">
+                      <DetectionReview
+                        detections={appState.detections}
+                        currentIndex={appState.currentDetectionIndex}
+                        onDetectionChoice={handleDetectionChoice}
+                        onIndexChange={(index) => setAppState(prev => ({ ...prev, currentDetectionIndex: index }))}
+                      />
                     </div>
-                  </div>
-                  <div className="card-body">
-                    <StatisticsPanel 
-                      video={appState.video}
-                      detections={appState.detections}
-                    />
                   </div>
                 </div>
                 
-                {/* Export Panel - Enhanced */}
-                <div className="card">
-                  <div className="card-header">
-                    <div className="flex items-center space-x-3">
-                      <span className="text-2xl">📤</span>
-                      <div>
-                        <h3 className="font-bold text-gray-900">Export Results</h3>
-                        <p className="text-xs text-gray-600">Download comprehensive reports</p>
-                      </div>
+                {/* Sidebar */}
+                <div className="xl:col-span-1 space-y-6">
+                  {/* Statistics Panel */}
+                  <div className="card">
+                    <div className="card-header">
+                      <h3 className="font-semibold text-gray-900 flex items-center">
+                        <span className="mr-2">📊</span>
+                        Statistics
+                      </h3>
+                    </div>
+                    <div className="card-body">
+                      <StatisticsPanel 
+                        video={appState.video}
+                        detections={appState.detections}
+                      />
                     </div>
                   </div>
-                  <div className="card-body">
-                    <ExportInterface
-                      video={appState.video}
-                      detections={appState.detections}
-                      onExport={handleExport}
-                      onStartOver={handleStartOver}
-                    />
+                  
+                  {/* Export Panel */}
+                  <div className="card">
+                    <div className="card-header">
+                      <h3 className="font-semibold text-gray-900 flex items-center">
+                        <span className="mr-2">📤</span>
+                        Export
+                      </h3>
+                    </div>
+                    <div className="card-body">
+                      <ExportInterface
+                        video={appState.video}
+                        detections={appState.detections}
+                        onExport={handleExport}
+                        onStartOver={handleStartOver}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -715,7 +646,7 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* Enhanced Resume Modal */}
+      {/* Resume Modal */}
       <ResumeAnalysis
         isVisible={showResumeModal}
         onClose={() => setShowResumeModal(false)}

@@ -15,7 +15,7 @@ const ResumeAnalysis: React.FC<ResumeAnalysisProps> = ({
 }) => {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [excelFile, setExcelFile] = useState<File | null>(null);
-  const [detectionMode, setDetectionMode] = useState<DetectionMode>(DetectionMode.VEHICLES);
+  const [detectionMode, setDetectionMode] = useState<DetectionMode>(DetectionMode.ALL_VEHICLES);
   const [modelConfidence, setModelConfidence] = useState(0.25);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -37,7 +37,7 @@ const ResumeAnalysis: React.FC<ResumeAnalysisProps> = ({
       onResumeSuccess(result);
       onClose();
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Resume failed:', error);
       alert(`Resume failed: ${error.message}`);
     } finally {
@@ -48,39 +48,44 @@ const ResumeAnalysis: React.FC<ResumeAnalysisProps> = ({
   if (!isVisible) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="card max-w-lg w-full">
         
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">
-            🔄 Resume Previous Analysis
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Instructions */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <div className="flex items-start space-x-2">
-            <span className="text-blue-500 mt-0.5">💡</span>
-            <div className="text-sm text-blue-800">
-              <div className="font-medium mb-1">How to Resume:</div>
-              <ol className="list-decimal list-inside space-y-1 text-xs">
-                <li>Upload the same video file you analyzed before</li>
-                <li>Upload the Excel file you exported previously</li>
-                <li>Continue reviewing from where you left off</li>
-              </ol>
-            </div>
+        <div className="card-header">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+              <span className="mr-2">🔄</span>
+              Resume Previous Analysis
+            </h3>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 p-1"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="card-body space-y-6">
           
+          {/* Instructions */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start space-x-3">
+              <span className="text-blue-500 text-xl">💡</span>
+              <div className="text-sm text-blue-800">
+                <div className="font-medium mb-2">How to Resume:</div>
+                <ol className="list-decimal list-inside space-y-1">
+                  <li>Upload the same video file you analyzed before</li>
+                  <li>Upload the Excel file you exported previously</li>
+                  <li>Continue reviewing from where you left off</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+
           {/* Video File Upload */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -90,11 +95,12 @@ const ResumeAnalysis: React.FC<ResumeAnalysisProps> = ({
               type="file"
               accept="video/*"
               onChange={(e) => setVideoFile(e.target.files?.[0] || null)}
-              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="form-input w-full"
             />
             {videoFile && (
-              <div className="mt-1 text-sm text-gray-600">
-                Selected: {videoFile.name}
+              <div className="mt-2 text-sm text-gray-600 flex items-center">
+                <span className="mr-2">📹</span>
+                {videoFile.name}
               </div>
             )}
           </div>
@@ -108,11 +114,12 @@ const ResumeAnalysis: React.FC<ResumeAnalysisProps> = ({
               type="file"
               accept=".xlsx,.xls"
               onChange={(e) => setExcelFile(e.target.files?.[0] || null)}
-              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="form-input w-full"
             />
             {excelFile && (
-              <div className="mt-1 text-sm text-gray-600">
-                Selected: {excelFile.name}
+              <div className="mt-2 text-sm text-gray-600 flex items-center">
+                <span className="mr-2">📊</span>
+                {excelFile.name}
               </div>
             )}
           </div>
@@ -125,11 +132,10 @@ const ResumeAnalysis: React.FC<ResumeAnalysisProps> = ({
             <select
               value={detectionMode}
               onChange={(e) => setDetectionMode(e.target.value as DetectionMode)}
-              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="form-select w-full"
             >
-              <option value={DetectionMode.VEHICLES}>🚗 Vehicles Only</option>
-              <option value={DetectionMode.PEOPLE}>👥 People Only</option>
-              <option value={DetectionMode.ALL}>🔍 All Objects</option>
+              <option value={DetectionMode.ALL_VEHICLES}>🚗 All Vehicles</option>
+              <option value={DetectionMode.MICRO_MOBILITY}>🛴 Micro-mobility</option>
             </select>
           </div>
 
@@ -147,37 +153,44 @@ const ResumeAnalysis: React.FC<ResumeAnalysisProps> = ({
               onChange={(e) => setModelConfidence(parseFloat(e.target.value))}
               className="w-full"
             />
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>10%</span>
+              <span>50%</span>
+              <span>90%</span>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex space-x-3 pt-4 border-t border-gray-200">
+            <button
+              onClick={onClose}
+              className="flex-1 btn btn-secondary"
+              disabled={isUploading}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleResume}
+              disabled={!videoFile || !excelFile || isUploading}
+              className="flex-1 btn btn-primary"
+            >
+              {isUploading ? (
+                <div className="flex items-center space-x-2">
+                  <div className="loading-spinner"></div>
+                  <span>Loading...</span>
+                </div>
+              ) : (
+                <>
+                  <span className="mr-2">🔄</span>
+                  Resume Analysis
+                </>
+              )}
+            </button>
           </div>
         </div>
-
-        {/* Actions */}
-        <div className="flex space-x-3 mt-6">
-          <button
-            onClick={onClose}
-            className="flex-1 btn btn-outline"
-            disabled={isUploading}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleResume}
-            disabled={!videoFile || !excelFile || isUploading}
-            className="flex-1 btn btn-primary"
-          >
-            {isUploading ? (
-              <div className="flex items-center space-x-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                <span>Loading...</span>
-              </div>
-            ) : (
-              '🔄 Resume Analysis'
-            )}
-          </button>
-        </div>
-
       </div>
     </div>
   );
 };
 
-export default ResumeAnalysis; 
+export default ResumeAnalysis;
