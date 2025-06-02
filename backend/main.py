@@ -509,42 +509,135 @@ async def resume_analysis(
 
         # Parse Excel and extract detections
         import pandas as pd
+        import re
         
         logger.info(f"📊 Parsing Excel file...")
         
         try:
-            # Read the Excel file - try different sheet names
+            # Read the Excel file - try specific sheet name first
             try:
-                df = pd.read_excel(excel_path, sheet_name='Detections')
+                df = pd.read_excel(excel_path, sheet_name='Detection Data')
+                logger.info(f"✅ Found 'Detection Data' sheet")
             except:
-                # Try other possible sheet names
                 try:
-                    df = pd.read_excel(excel_path, sheet_name=0)  # First sheet
+                    df = pd.read_excel(excel_path, sheet_name='Detections')
+                    logger.info(f"✅ Found 'Detections' sheet")
                 except:
-                    df = pd.read_excel(excel_path)
+                    # Fall back to first sheet
+                    df = pd.read_excel(excel_path, sheet_name=0)
+                    logger.info(f"✅ Using first sheet")
             
             logger.info(f"📋 Found {len(df)} rows in Excel")
             logger.info(f"Columns: {list(df.columns)}")
+            
+            # Helper function to convert timestamp to seconds
+            def parse_timestamp(timestamp_str):
+                if isinstance(timestamp_str, (int, float)):
+                    return float(timestamp_str)
+                if isinstance(timestamp_str, str):
+                    # Handle "00:00:05.000" format
+                    match = re.match(r'(\d{2}):(\d{2}):(\d{2})\.(\d{3})', timestamp_str)
+                    if match:
+                        hours, minutes, seconds, milliseconds = match.groups()
+                        total_seconds = int(hours) * 3600 + int(minutes) * 60 + int(seconds) + int(milliseconds) / 1000
+                        return total_seconds
+                    # Handle other numeric string formats
+                    try:
+                        return float(timestamp_str)
+                    except:
+                        return 0.0
+                return 0.0
             
             # Convert Excel data back to detection format
             detections = []
             for idx, row in df.iterrows():
                 try:
+                    # Map columns with flexible names (handle spaces and underscores)
+                    detection_id = (
+                        row.get('Detection ID') or 
+                        row.get('Detection_ID') or 
+                        row.get('detection_id') or 
+                        f"det_{idx}"
+                    )
+                    
+                    frame_number = (
+                        row.get('Frame Number') or 
+                        row.get('Frame_Number') or 
+                        row.get('frame_number') or 
+                        0
+                    )
+                    
+                    timestamp_raw = (
+                        row.get('Timestamp') or 
+                        row.get('Timestamp_Seconds') or 
+                        row.get('timestamp') or 
+                        0
+                    )
+                    
+                    object_type = (
+                        row.get('Model Prediction') or 
+                        row.get('AI_Prediction') or 
+                        row.get('object_type') or 
+                        'car'
+                    )
+                    
+                    confidence = (
+                        row.get('Model Confidence') or 
+                        row.get('AI_Confidence') or 
+                        row.get('confidence') or 
+                        0.5
+                    )
+                    
+                    user_choice = (
+                        row.get('User Choice') or 
+                        row.get('User_Choice') or 
+                        row.get('user_choice')
+                    )
+                    
+                    bbox_x = (
+                        row.get('Bbox X') or 
+                        row.get('Bbox_X') or 
+                        row.get('bbox_x') or 
+                        0
+                    )
+                    
+                    bbox_y = (
+                        row.get('Bbox Y') or 
+                        row.get('Bbox_Y') or 
+                        row.get('bbox_y') or 
+                        0
+                    )
+                    
+                    bbox_width = (
+                        row.get('Bbox Width') or 
+                        row.get('Bbox_Width') or 
+                        row.get('bbox_width') or 
+                        100
+                    )
+                    
+                    bbox_height = (
+                        row.get('Bbox Height') or 
+                        row.get('Bbox_Height') or 
+                        row.get('bbox_height') or 
+                        100
+                    )
+                    
                     detection = {
-                        "id": str(row.get('Detection_ID', f"det_{idx}")),
-                        "frame_number": int(row.get('Frame_Number', 0)),
-                        "timestamp": float(row.get('Timestamp_Seconds', 0.0)),
-                        "object_type": str(row.get('AI_Prediction', 'car')),
-                        "confidence": float(row.get('AI_Confidence', 0.5)),
+                        "id": str(detection_id),
+                        "frame_number": int(frame_number),
+                        "timestamp": parse_timestamp(timestamp_raw),
+                        "object_type": str(object_type),
+                        "confidence": float(confidence),
                         "bbox": {
-                            "x": float(row.get('Bbox_X', 0)),
-                            "y": float(row.get('Bbox_Y', 0)), 
-                            "width": float(row.get('Bbox_Width', 100)),
-                            "height": float(row.get('Bbox_Height', 100))
+                            "x": float(bbox_x),
+                            "y": float(bbox_y), 
+                            "width": float(bbox_width),
+                            "height": float(bbox_height)
                         },
-                        "user_choice": str(row.get('User_Choice', '')) if pd.notna(row.get('User_Choice')) else None
+                        "user_choice": str(user_choice) if pd.notna(user_choice) and str(user_choice).lower() not in ['', 'none', 'nan', 'not reviewed'] else None
                     }
                     detections.append(detection)
+                    
                 except Exception as e:
                     logger.warning(f"⚠️ Skipped row {idx}: {str(e)}")
                     continue

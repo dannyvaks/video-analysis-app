@@ -1,49 +1,12 @@
-// Core detection types
-export interface BoundingBox {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
+// types/index.ts - Complete fixed version
 
-export interface ModelSuggestion {
-  type: VehicleType;
-  confidence: number;
-}
-
-export interface Detection {
-  id: string;
-  timestamp: string;
-  frameNumber: number;
-  frameImageData: string; // Base64 encoded frame image
-  boundingBox: BoundingBox;
-  modelSuggestions: ModelSuggestion[];
-  userChoice: VehicleType | null;
-  isManualLabel: boolean;
-  isManualCorrection: boolean;
-  processedAt: string;
-  correctedBy?: string;
-}
-
-// Vehicle and micro-mobility types
-export type VehicleType = 
-  | 'bicycle'
-  | 'motorcycle' 
-  | 'electric_motorcycle'
-  | 'electric_scooter'
-  | 'motorcycle_cab'
-  | 'car'
-  | 'truck'
-  | 'bus'
-  | 'van'
-  | 'unknown';
-
+// Detection Mode Enum
 export enum DetectionMode {
-  MICRO_MOBILITY_ONLY = 'micro_mobility_only',
-  ALL_VEHICLES = 'all_vehicles'
+  ALL_VEHICLES = 'all_vehicles',
+  MICRO_MOBILITY = 'micro_mobility_only'
 }
 
-// Video processing types
+// Video metadata interface
 export interface VideoMetadata {
   filename: string;
   duration: number;
@@ -55,89 +18,51 @@ export interface VideoMetadata {
   uploadedAt: string;
 }
 
+// Model suggestion interface
+export interface ModelSuggestion {
+  type: string;
+  confidence: number;
+}
+
+// Bounding box interface
+export interface BoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+// Detection interface
+export interface Detection {
+  id: string;
+  timestamp: string;
+  frameNumber: number;
+  frameImageData: string;
+  boundingBox: BoundingBox;
+  modelSuggestions: ModelSuggestion[];
+  userChoice?: string | null;
+  isManualLabel: boolean;
+  isManualCorrection: boolean;
+  processedAt: string;
+}
+
+// Processing progress interface
 export interface ProcessingProgress {
   currentFrame: number;
   totalFrames: number;
   percentage: number;
-  estimatedTimeRemaining?: number;
-  status: 'initializing' | 'processing' | 'completed' | 'error';
-  message?: string;
+  status: string;
+  message: string;
 }
 
-// Model loading types
+// Model loading progress interface
 export interface ModelLoadingProgress {
-  loaded: number;
-  total: number;
+  stage: string;
   percentage: number;
-  status: 'downloading' | 'loading' | 'ready' | 'error';
-  message?: string;
+  message: string;
 }
 
-// YOLOv8m specific types
-export interface YOLODetection {
-  class: string;
-  confidence: number;
-  bbox: [number, number, number, number]; // [x, y, width, height]
-  classId: number;
-}
-
-export interface YOLOModelConfig {
-  modelUrl: string;
-  inputSize: [number, number]; // [width, height]
-  confidenceThreshold: number;
-  iouThreshold: number;
-  maxDetections: number;
-  classNames: string[];
-}
-
-// Statistics and reporting types
-export interface DetectionStatistics {
-  totalDetections: number;
-  detectionsByType: Record<VehicleType, number>;
-  detectionsByConfidence: {
-    high: number; // >0.8
-    medium: number; // 0.5-0.8
-    low: number; // <0.5
-  };
-  manualCorrections: number;
-  manuallyAdded: number;
-  processingTime: number;
-  averageConfidence: number;
-  framesCovered: number;
-  detectionDensity: number; // detections per minute
-}
-
-export interface ExportData {
-  videoMetadata: VideoMetadata;
-  detections: Detection[];
-  statistics: DetectionStatistics;
-  exportedAt: string;
-  exportVersion: string;
-}
-
-// UI state types
-export interface AppState {
-  currentStep: 'upload' | 'processing' | 'review' | 'export';
-  video: VideoMetadata | null;
-  detections: Detection[];
-  currentDetectionIndex: number;
-  detectionMode: DetectionMode.ALL_VEHICLES;
-  modelLoaded: boolean;
-  isProcessing: boolean;
-  processingProgress: ProcessingProgress | null;
-  modelLoadingProgress: ModelLoadingProgress | null;
-}
-
-// User interaction types
-export interface UserChoice {
-  detectionId: string;
-  selectedType: VehicleType;
-  confidence: number;
-  isManual: boolean;
-  timestamp: string;
-}
-
-// Error handling types
+// Application error interface
 export interface AppError {
   code: string;
   message: string;
@@ -146,35 +71,51 @@ export interface AppError {
   recoverable: boolean;
 }
 
-// Utility types
-export type DeepPartial<T> = {
-  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
-};
-
-export type RequiredFields<T, K extends keyof T> = T & Required<Pick<T, K>>;
-
-// Event types for tracking user actions
-export interface UserActionEvent {
-  type: 'detection_accepted' | 'detection_corrected' | 'detection_added' | 'detection_skipped';
+// User choice interface
+export interface UserChoice {
   detectionId: string;
+  selectedType: VehicleType;
+  confidence: number;
+  isManual: boolean;
   timestamp: string;
-  originalSuggestion?: VehicleType;
-  userChoice: VehicleType;
-  timeTaken: number; // milliseconds
 }
 
-// Configuration types
-export interface AppConfig {
-  model: YOLOModelConfig;
-  ui: {
-    autoAdvance: boolean;
-    showConfidenceScores: boolean;
-    defaultDetectionMode: DetectionMode;
-    batchSize: number;
-  };
-  export: {
-    includeFrameImages: boolean;
-    compression: boolean;
-    format: 'xlsx' | 'csv';
-  };
+// Vehicle type type
+export type VehicleType = string;
+
+// Main application state interface - FIXED
+export interface AppState {
+  currentStep: 'upload' | 'processing' | 'review' | 'export';
+  video: VideoMetadata | null;
+  detections: Detection[];
+  currentDetectionIndex: number;
+  detectionMode: DetectionMode; // ✅ Fixed: This should be DetectionMode, not DetectionMode.ALL_VEHICLES
+  modelLoaded: boolean;
+  isProcessing: boolean;
+  processingProgress: ProcessingProgress | null;
+  modelLoadingProgress: ModelLoadingProgress | null;
 }
+
+// Detection statistics interface
+export interface DetectionStatistics {
+  totalDetections: number;
+  detectionsByType: Record<string, number>;
+  detectionsByConfidence: Record<string, number>;
+  manualCorrections: number;
+  manuallyAdded: number;
+  processingTime: number;
+  averageConfidence: number;
+  framesCovered: number;
+  detectionDensity: number;
+}
+
+// Export data interface
+export interface ExportData {
+  video: VideoMetadata;
+  detections: Detection[];
+  statistics: DetectionStatistics;
+  exportedAt: string;
+}
+
+// Type aliases for convenience
+export type DetectionModeType = DetectionMode.ALL_VEHICLES | DetectionMode.MICRO_MOBILITY;

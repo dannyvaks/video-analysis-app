@@ -30,7 +30,7 @@ const App: React.FC = () => {
     video: null,
     detections: [],
     currentDetectionIndex: 0,
-    detectionMode: DetectionMode.ALL_VEHICLES,
+    detectionMode: DetectionMode.ALL_VEHICLES, // Default to ALL_VEHICLES
     modelLoaded: false,
     isProcessing: false,
     processingProgress: null,
@@ -45,6 +45,30 @@ const App: React.FC = () => {
 
   // Add state for resume modal
   const [showResumeModal, setShowResumeModal] = useState(false);
+
+  // Define steps array for the progress indicator
+  const steps = [
+    { 
+      key: 'upload', 
+      label: 'Upload', 
+      icon: '📁',
+      description: 'Select video file'
+    },
+    { 
+      key: 'processing', 
+      label: 'Processing', 
+      icon: '🔄',
+      description: 'AI analysis in progress'
+    },
+    { 
+      key: 'review', 
+      label: 'Review', 
+      icon: '✅',
+      description: 'Verify detections'
+    },
+  ];
+
+  const currentStepIndex = steps.findIndex(step => step.key === appState.currentStep);
 
   // Initialize backend connection and check model status
   useEffect(() => {
@@ -396,7 +420,7 @@ const App: React.FC = () => {
         ...prev,
         video: data.video,
         detections: data.detections || [],
-        detectionMode: data.detection_mode || DetectionMode.VEHICLES,
+        detectionMode: data.detection_mode || DetectionMode.ALL_VEHICLES,
         currentStep: 'review',
         currentDetectionIndex: 0,
         isProcessing: false,
@@ -432,14 +456,26 @@ const App: React.FC = () => {
   // Show model loading screen if model is not ready
   if (!appState.modelLoaded && !error) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen relative overflow-hidden">
+        {/* Background */}
+        <div className="fixed inset-0 z-0">
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900"></div>
+        </div>
+        
         <Header 
           currentStep={appState.currentStep}
           onStartOver={handleStartOver}
           detectionMode={appState.detectionMode}
           onDetectionModeChange={handleDetectionModeChange}
         />
-        <ModelLoader progress={appState.modelLoadingProgress} />
+        
+        <div className="relative z-10 flex items-center justify-center min-h-screen">
+          <div className="card">
+            <div className="card-body">
+              <ModelLoader progress={appState.modelLoadingProgress} />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -447,24 +483,59 @@ const App: React.FC = () => {
   // Show error screen
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen relative overflow-hidden">
+        {/* Background */}
+        <div className="fixed inset-0 z-0">
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900"></div>
+        </div>
+        
         <Header 
           currentStep={appState.currentStep}
           onStartOver={handleStartOver}
           detectionMode={appState.detectionMode}
           onDetectionModeChange={handleDetectionModeChange}
         />
-        <ErrorBoundary 
-          error={error} 
-          onRetry={handleRetry}
-          onStartOver={handleStartOver}
-        />
+        
+        <div className="relative z-10 flex items-center justify-center min-h-screen">
+          <div className="card max-w-md w-full">
+            <div className="card-body">
+              <ErrorBoundary 
+                error={error} 
+                onRetry={handleRetry}
+                onStartOver={handleStartOver}
+              />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Enhanced Background with Particles */}
+      <div className="fixed inset-0 z-0">
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900"></div>
+        <div className="absolute inset-0 bg-gradient-to-tr from-blue-600/20 via-transparent to-emerald-400/20"></div>
+        
+        {/* Floating Particles */}
+        <div className="absolute inset-0 overflow-hidden">
+          {[...Array(20)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute w-2 h-2 bg-white/10 rounded-full animate-pulse"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+                animationDelay: `${Math.random() * 3}s`,
+                animationDuration: `${3 + Math.random() * 4}s`
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Enhanced Header */}
       <Header 
         currentStep={appState.currentStep}
         onStartOver={handleStartOver}
@@ -472,63 +543,118 @@ const App: React.FC = () => {
         onDetectionModeChange={handleDetectionModeChange}
       />
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Upload Step */}
+      {/* Enhanced Main Content */}
+      <main className="relative z-10">
+        
+        {/* Upload Step - Enhanced */}
         {appState.currentStep === 'upload' && (
-          <>
+          <div className="fade-in">
             <VideoUpload 
               onVideoUpload={handleVideoUpload}
-              onResumeFromExcel={handleResumeFromExcel}
               detectionMode={appState.detectionMode}
+              onResumeFromExcel={handleResumeFromExcel}
             />
-            <div className="mt-4 text-center">
-              <button
-                onClick={() => setShowResumeModal(true)}
-                className="text-sm text-blue-600 hover:text-blue-800 underline"
-              >
-                📁 Resume Previous Analysis
-              </button>
+            
+            {/* Enhanced Resume Section */}
+            <div className="container-narrow py-8">
+              <div className="text-center">
+                <div className="card card-compact inline-block">
+                  <div className="p-6">
+                    <div className="flex items-center space-x-4">
+                      <div className="text-3xl">📁</div>
+                      <div className="text-left">
+                        <div className="font-semibold text-gray-900">Continue Previous Work?</div>
+                        <div className="text-sm text-gray-600">Resume from a previous Excel export</div>
+                      </div>
+                      <button
+                        onClick={() => setShowResumeModal(true)}
+                        className="btn btn-outline btn-sm"
+                      >
+                        Resume Analysis
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-          </>
+          </div>
         )}
 
-        {/* Processing Step */}
+        {/* Processing Step - Enhanced */}
         {appState.currentStep === 'processing' && (
-          <div className="max-w-4xl mx-auto fade-in">
-            <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">
+          <div className="container-narrow py-12 fade-in">
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center space-x-3 px-6 py-3 bg-white/10 backdrop-blur-xl text-white rounded-full border border-white/20 mb-8">
+                <div className="w-3 h-3 bg-emerald-400 rounded-full animate-pulse"></div>
+                <span className="font-medium">AI Processing Active</span>
+              </div>
+              
+              <h2 className="text-4xl md:text-6xl font-bold text-white mb-6">
                 🔍 Analyzing Your Video
               </h2>
-              <p className="text-lg text-gray-600">
-                Our AI is processing your video frame by frame
+              <p className="text-xl text-white/80 max-w-2xl mx-auto">
+                Our advanced AI is processing your video frame by frame, 
+                detecting and classifying vehicles with precision
               </p>
             </div>
             
-            <div className="card">
+            <div className="card scale-in">
               <div className="card-body">
                 <VideoPlayer 
                   video={appState.video}
                   isProcessing={true}
                   processingProgress={appState.processingProgress}
                 />
+                
+                {/* Enhanced Progress Display */}
+                {appState.processingProgress && (
+                  <div className="mt-8 space-y-4">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-gray-900">
+                        {appState.processingProgress.status}
+                      </span>
+                      <span className="text-gray-600">
+                        {appState.processingProgress.currentFrame} / {appState.processingProgress.totalFrames} frames
+                      </span>
+                    </div>
+                    
+                    <div className="progress-container">
+                      <div 
+                        className="progress-bar"
+                        style={{ width: `${appState.processingProgress.percentage}%` }}
+                      />
+                    </div>
+                    
+                    <div className="text-center">
+                      <p className="text-gray-600">{appState.processingProgress.message}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         )}
 
-        {/* Review Step */}
+        {/* Review Step - Enhanced Layout */}
         {appState.currentStep === 'review' && (
-          <div className="fade-in">
-            <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">
+          <div className="container-wide py-12 fade-in">
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center space-x-3 px-6 py-3 bg-white/10 backdrop-blur-xl text-white rounded-full border border-white/20 mb-8">
+                <span className="text-emerald-400">✓</span>
+                <span className="font-medium">Analysis Complete</span>
+              </div>
+              
+              <h2 className="text-4xl md:text-6xl font-bold text-white mb-6">
                 ✅ Review Detections
               </h2>
-              <p className="text-lg text-gray-600">
-                Verify detected vehicles to ensure accuracy
+              <p className="text-xl text-white/80 max-w-3xl mx-auto">
+                Verify and refine the AI detections to ensure maximum accuracy. 
+                Your expertise helps perfect the results.
               </p>
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+              {/* Main Detection Review - Enhanced */}
               <div className="xl:col-span-3">
                 <div className="card">
                   <div className="card-body">
@@ -542,10 +668,18 @@ const App: React.FC = () => {
                 </div>
               </div>
               
+              {/* Enhanced Sidebar */}
               <div className="xl:col-span-1 space-y-6">
+                {/* Statistics Panel - Enhanced */}
                 <div className="card">
                   <div className="card-header">
-                    <h3 className="font-semibold text-gray-900">📊 Statistics</h3>
+                    <div className="flex items-center space-x-3">
+                      <span className="text-2xl">📊</span>
+                      <div>
+                        <h3 className="font-bold text-gray-900">Live Statistics</h3>
+                        <p className="text-xs text-gray-600">Real-time analysis metrics</p>
+                      </div>
+                    </div>
                   </div>
                   <div className="card-body">
                     <StatisticsPanel 
@@ -555,9 +689,16 @@ const App: React.FC = () => {
                   </div>
                 </div>
                 
+                {/* Export Panel - Enhanced */}
                 <div className="card">
                   <div className="card-header">
-                    <h3 className="font-semibold text-gray-900">📤 Export</h3>
+                    <div className="flex items-center space-x-3">
+                      <span className="text-2xl">📤</span>
+                      <div>
+                        <h3 className="font-bold text-gray-900">Export Results</h3>
+                        <p className="text-xs text-gray-600">Download comprehensive reports</p>
+                      </div>
+                    </div>
                   </div>
                   <div className="card-body">
                     <ExportInterface
@@ -574,7 +715,7 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* Add the Resume Modal */}
+      {/* Enhanced Resume Modal */}
       <ResumeAnalysis
         isVisible={showResumeModal}
         onClose={() => setShowResumeModal(false)}
