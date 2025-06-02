@@ -7,6 +7,14 @@ backend/uploads/
 backend/logs/
 backend/temp/
 
+# Model files (too large for GitHub)
+backend/*.pt
+backend/*.onnx
+backend/*.weights
+*.pt
+*.onnx
+*.weights
+
 # Environment variables
 .env
 .env.local
