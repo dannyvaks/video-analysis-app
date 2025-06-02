@@ -121,8 +121,24 @@ const DetectionReview: React.FC<DetectionReviewProps> = ({
     return `${(confidence * 100).toFixed(1)}%`;
   };
 
-  const formatTimestamp = (timestamp: string): string => {
-    return timestamp.split('.')[0]; // Remove milliseconds for cleaner display
+  // FIXED: Handle both string and number timestamps
+  const formatTimestamp = (timestamp: string | number): string => {
+    if (typeof timestamp === 'number') {
+      // Convert seconds to HH:MM:SS.mmm format
+      const hours = Math.floor(timestamp / 3600);
+      const minutes = Math.floor((timestamp % 3600) / 60);
+      const seconds = timestamp % 60;
+      const wholeSeconds = Math.floor(seconds);
+      const milliseconds = Math.round((seconds - wholeSeconds) * 1000);
+      
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${wholeSeconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}`;
+    }
+    
+    if (typeof timestamp === 'string') {
+      return timestamp.split('.')[0]; // Remove milliseconds for cleaner display
+    }
+    
+    return '00:00:00'; // Fallback
   };
 
   const getReviewStats = () => {
@@ -216,9 +232,9 @@ const DetectionReview: React.FC<DetectionReviewProps> = ({
 
         {/* Progress Bar */}
         <div className="mt-4">
-          <div className="progress-bar">
+          <div className="progress-container">
             <div 
-              className="progress-fill bg-green-500"
+              className="progress-bar bg-green-500"
               style={{ width: `${(reviewStats.reviewed / reviewStats.total) * 100}%` }}
             />
           </div>
@@ -285,54 +301,60 @@ const DetectionReview: React.FC<DetectionReviewProps> = ({
 
           {/* Model Suggestions */}
           <div className="space-y-3 mb-6">
-            {currentDetection.modelSuggestions.map((suggestion, index) => (
-              <div
-                key={index}
-                className={`relative border rounded-lg p-3 cursor-pointer transition-all duration-200 hover:border-blue-300 hover:shadow-md ${
-                  currentDetection.userChoice === suggestion.type 
-                    ? 'border-blue-500 bg-blue-50' 
-                    : 'border-gray-200'
-                }`}
-                onClick={() => handleChoiceSelection(
-                  suggestion.type as VehicleType,
-                  suggestion.confidence,
-                  false
-                )}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <span className="text-2xl">
-                      {getVehicleTypeIcon(suggestion.type)}
-                    </span>
-                    <div>
-                      <div className="font-medium text-gray-900 capitalize">
-                        {suggestion.type.replace('_', ' ')}
+            {currentDetection.modelSuggestions && currentDetection.modelSuggestions.length > 0 ? (
+              currentDetection.modelSuggestions.map((suggestion, index) => (
+                <div
+                  key={index}
+                  className={`relative border rounded-lg p-3 cursor-pointer transition-all duration-200 hover:border-blue-300 hover:shadow-md ${
+                    currentDetection.userChoice === suggestion.type 
+                      ? 'border-blue-500 bg-blue-50' 
+                      : 'border-gray-200'
+                  }`}
+                  onClick={() => handleChoiceSelection(
+                    suggestion.type as VehicleType,
+                    suggestion.confidence,
+                    false
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <span className="text-2xl">
+                        {getVehicleTypeIcon(suggestion.type)}
+                      </span>
+                      <div>
+                        <div className="font-medium text-gray-900 capitalize">
+                          {suggestion.type.replace('_', ' ')}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          Model Suggestion #{index + 1}
+                        </div>
                       </div>
-                      <div className="text-sm text-gray-600">
-                        Model Suggestion #{index + 1}
+                    </div>
+                    <div className="text-right">
+                      <div className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                        getConfidenceColor(suggestion.confidence)
+                      }`}>
+                        {formatConfidence(suggestion.confidence)}
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                      getConfidenceColor(suggestion.confidence)
-                    }`}>
-                      {formatConfidence(suggestion.confidence)}
-                    </div>
-                  </div>
-                </div>
 
-                {currentDetection.userChoice === suggestion.type && (
-                  <div className="absolute top-2 right-2">
-                    <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
+                  {currentDetection.userChoice === suggestion.type && (
+                    <div className="absolute top-2 right-2">
+                      <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="text-gray-500 text-center py-4">
+                No model suggestions available
               </div>
-            ))}
+            )}
           </div>
 
           {/* Custom Label Option */}

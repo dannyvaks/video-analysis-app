@@ -464,6 +464,11 @@ async def internal_error_handler(request, exc):
     logger.error(f"Internal server error: {str(exc)}")
     return {"error": "Internal server error", "detail": "An unexpected error occurred"}
 
+import cv2
+import base64
+from io import BytesIO
+from PIL import Image
+
 @app.post("/video/resume")
 async def resume_analysis(
     video_file: UploadFile = File(...),
@@ -471,7 +476,7 @@ async def resume_analysis(
     detection_mode: str = Form(...),
     model_confidence: float = Form(...)
 ):
-    """Resume analysis from previously exported Excel file"""
+    """Resume analysis from previously exported Excel file with frame extraction"""
     try:
         logger.info(f"🔄 Starting resume analysis...")
         logger.info(f"Video: {video_file.filename}")
@@ -496,8 +501,6 @@ async def resume_analysis(
         excel_path = os.path.join(upload_dir, excel_filename)
         
         logger.info(f"💾 Saving files...")
-        logger.info(f"Video path: {video_path}")
-        logger.info(f"Excel path: {excel_path}")
         
         # Save video file
         with open(video_path, "wb") as buffer:
@@ -512,6 +515,36 @@ async def resume_analysis(
         import re
         
         logger.info(f"📊 Parsing Excel file...")
+        
+        # Helper function to extract frame from video
+        def extract_frame_image(video_path: str, frame_number: int, bbox: dict) -> str:
+            """Extract frame image and crop to bounding box"""
+            try:
+                cap = cv2.VideoCapture(video_path)
+                cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
+                ret, frame = cap.read()
+                cap.release()
+                
+                if not ret:
+                    return ""
+                
+                # Crop frame to bounding box (with some padding)
+                height, width = frame.shape[:2]
+                x = max(0, int(bbox['x'] - bbox['width'] * 0.1))
+                y = max(0, int(bbox['y'] - bbox['height'] * 0.1))
+                w = min(width - x, int(bbox['width'] * 1.2))
+                h = min(height - y, int(bbox['height'] * 1.2))
+                
+                cropped_frame = frame[y:y+h, x:x+w]
+                
+                # Convert to base64
+                _, buffer = cv2.imencode('.jpg', cropped_frame)
+                img_base64 = base64.b64encode(buffer).decode('utf-8')
+                return f"data:image/jpeg;base64,{img_base64}"
+                
+            except Exception as e:
+                logger.warning(f"Failed to extract frame {frame_number}: {str(e)}")
+                return ""
         
         try:
             # Read the Excel file - try specific sheet name first
@@ -548,8 +581,26 @@ async def resume_analysis(
                         return 0.0
                 return 0.0
             
-            # Convert Excel data back to detection format
+            # Open video for frame extraction
+            logger.info(f"🎬 Opening video for frame extraction...")
+            cap = cv2.VideoCapture(video_path)
+            if not cap.isOpened():
+                raise Exception("Could not open video file")
+            
+            # Get video metadata
+            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            duration = frame_count / fps if fps > 0 else 0
+            cap.release()
+            
+            logger.info(f"🎬 Video: {width}x{height}, {frame_count} frames, {fps:.1f} FPS")
+            
+            # Convert Excel data back to detection format with frame extraction
             detections = []
+            logger.info(f"🖼️ Extracting frames for {len(df)} detections...")
+            
             for idx, row in df.iterrows():
                 try:
                     # Map columns with flexible names (handle spaces and underscores)
@@ -622,54 +673,68 @@ async def resume_analysis(
                         100
                     )
                     
+                    manual_correction = (
+                        row.get('Manual Correction') or 
+                        row.get('Manual_Correction') or 
+                        'No'
+                    )
+                    
+                    manual_label = (
+                        row.get('Manual Label') or 
+                        row.get('Manual_Label') or 
+                        'No'
+                    )
+                    
+                    # Create bounding box for frame extraction
+                    bbox = {
+                        'x': float(bbox_x),
+                        'y': float(bbox_y),
+                        'width': float(bbox_width),
+                        'height': float(bbox_height)
+                    }
+                    
+                    # Extract frame image for this detection
+                    frame_image_data = extract_frame_image(video_path, int(frame_number), bbox)
+                    
+                    # Create detection with proper frontend structure
                     detection = {
                         "id": str(detection_id),
-                        "frame_number": int(frame_number),
+                        "frameNumber": int(frame_number),
                         "timestamp": parse_timestamp(timestamp_raw),
-                        "object_type": str(object_type),
-                        "confidence": float(confidence),
-                        "bbox": {
-                            "x": float(bbox_x),
-                            "y": float(bbox_y), 
-                            "width": float(bbox_width),
-                            "height": float(bbox_height)
-                        },
-                        "user_choice": str(user_choice) if pd.notna(user_choice) and str(user_choice).lower() not in ['', 'none', 'nan', 'not reviewed'] else None
+                        "frameImageData": frame_image_data,  # Now includes extracted frame
+                        "boundingBox": bbox,
+                        "modelSuggestions": [{
+                            "type": str(object_type),
+                            "confidence": float(confidence)
+                        }],
+                        "userChoice": str(user_choice) if pd.notna(user_choice) and str(user_choice).lower() not in ['', 'none', 'nan', 'not reviewed'] else None,
+                        "isManualLabel": str(manual_label).lower() == 'yes',
+                        "isManualCorrection": str(manual_correction).lower() == 'yes',
+                        "processedAt": datetime.now().isoformat()
                     }
                     detections.append(detection)
+                    
+                    # Log progress every 10 detections
+                    if (idx + 1) % 10 == 0:
+                        logger.info(f"📷 Processed {idx + 1}/{len(df)} detections")
                     
                 except Exception as e:
                     logger.warning(f"⚠️ Skipped row {idx}: {str(e)}")
                     continue
             
-            logger.info(f"✅ Parsed {len(detections)} detections")
+            logger.info(f"✅ Parsed {len(detections)} detections with frame images")
             
-            # Get video metadata
-            import cv2
-            logger.info(f"🎬 Reading video metadata...")
-            
-            cap = cv2.VideoCapture(video_path)
-            if not cap.isOpened():
-                raise Exception("Could not open video file")
-                
-            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            fps = cap.get(cv2.CAP_PROP_FPS)
-            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            duration = frame_count / fps if fps > 0 else 0
-            cap.release()
-            
+            # Create video metadata with proper frontend structure
             video_metadata = {
                 "filename": video_filename,
-                "path": video_path,
                 "duration": duration,
-                "frame_count": frame_count,
+                "width": width,
+                "height": height,
                 "fps": fps,
-                "resolution": {"width": width, "height": height},
-                "file_size": os.path.getsize(video_path)
+                "frameCount": frame_count,
+                "fileSize": os.path.getsize(video_path),
+                "uploadedAt": datetime.now().isoformat()
             }
-            
-            logger.info(f"🎬 Video: {width}x{height}, {frame_count} frames, {fps:.1f} FPS")
             
             # Clean up Excel file
             try:
@@ -678,11 +743,11 @@ async def resume_analysis(
             except:
                 pass
             
-            logger.info(f"✅ Resume completed successfully!")
+            logger.info(f"✅ Resume completed successfully with frame extraction!")
             
             return {
                 "status": "success",
-                "message": f"Resumed analysis from Excel with {len(detections)} detections",
+                "message": f"Resumed analysis from Excel with {len(detections)} detections and extracted frames",
                 "video": video_metadata,
                 "detections": detections,
                 "detection_mode": detection_mode,

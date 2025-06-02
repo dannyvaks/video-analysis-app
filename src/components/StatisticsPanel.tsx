@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
 import { VideoMetadata, Detection } from '../types';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 
 interface StatisticsPanelProps {
   video: VideoMetadata | null;
@@ -8,128 +7,100 @@ interface StatisticsPanelProps {
 }
 
 const StatisticsPanel: React.FC<StatisticsPanelProps> = ({ video, detections }) => {
-  // Calculate statistics
+  // FIXED: Calculate statistics with proper null/undefined checks
   const statistics = useMemo(() => {
-    if (!detections.length || !video) {
+    if (!detections || detections.length === 0) {
       return {
         totalDetections: 0,
+        reviewedDetections: 0,
+        uniqueFrames: 0,
         detectionsByType: {},
-        detectionsByConfidence: { high: 0, medium: 0, low: 0 },
-        manualCorrections: 0,
-        manuallyAdded: 0,
         averageConfidence: 0,
+        manualCorrections: 0,
         detectionDensity: 0,
-        reviewProgress: 0,
-        framesCovered: 0
+        reviewProgress: 0
       };
     }
 
+    // Basic counts
+    const totalDetections = detections.length;
+    const reviewedDetections = detections.filter(d => d.userChoice).length;
+    const manualCorrections = detections.filter(d => d.isManualCorrection).length;
+
+    // Get unique frames
+    const uniqueFrames = new Set(detections.map(d => d.frameNumber)).size;
+
+    // Group by vehicle type (from user choice or model prediction)
     const detectionsByType: Record<string, number> = {};
-    let totalConfidence = 0;
-    let confidenceCount = 0;
-    let highConf = 0, mediumConf = 0, lowConf = 0;
-    let manualCorrections = 0;
-    let manuallyAdded = 0;
-    const reviewedCount = detections.filter(d => d.userChoice).length;
-    const frameNumbers = new Set(detections.map(d => d.frameNumber));
-
     detections.forEach(detection => {
-      // Count by type (use user choice if available, otherwise primary model suggestion)
-      const vehicleType = detection.userChoice || 
-        (detection.modelSuggestions[0]?.type) || 'unknown';
+      let vehicleType = detection.userChoice;
       
-      detectionsByType[vehicleType] = (detectionsByType[vehicleType] || 0) + 1;
-
-      // Confidence statistics
-      if (detection.modelSuggestions[0]?.confidence) {
-        const confidence = detection.modelSuggestions[0].confidence;
-        totalConfidence += confidence;
-        confidenceCount++;
-
-        if (confidence >= 0.8) highConf++;
-        else if (confidence >= 0.5) mediumConf++;
-        else lowConf++;
+      // FIXED: Safely access model suggestions
+      if (!vehicleType && detection.modelSuggestions && detection.modelSuggestions.length > 0) {
+        vehicleType = detection.modelSuggestions[0]?.type || 'unknown';
+      }
+      
+      if (!vehicleType) {
+        vehicleType = 'unknown';
       }
 
-      // Manual intervention tracking
-      if (detection.isManualCorrection) manualCorrections++;
-      if (detection.isManualLabel) manuallyAdded++;
+      vehicleType = vehicleType.replace(/_/g, ' ').toLowerCase();
+      detectionsByType[vehicleType] = (detectionsByType[vehicleType] || 0) + 1;
+    });
+
+    // Calculate average confidence
+    let totalConfidence = 0;
+    let confidenceCount = 0;
+    
+    detections.forEach(detection => {
+      // FIXED: Safely access model suggestions for confidence
+      if (detection.modelSuggestions && detection.modelSuggestions.length > 0) {
+        const confidence = detection.modelSuggestions[0]?.confidence;
+        if (typeof confidence === 'number' && !isNaN(confidence)) {
+          totalConfidence += confidence;
+          confidenceCount++;
+        }
+      }
     });
 
     const averageConfidence = confidenceCount > 0 ? totalConfidence / confidenceCount : 0;
-    const detectionDensity = video.duration > 0 ? (detections.length / (video.duration / 60)) : 0;
-    const reviewProgress = (reviewedCount / detections.length) * 100;
+
+    // Calculate detection density (detections per minute)
+    const detectionDensity = video && video.duration > 0 
+      ? (totalDetections / (video.duration / 60)) 
+      : 0;
+
+    // Review progress
+    const reviewProgress = totalDetections > 0 ? (reviewedDetections / totalDetections) * 100 : 0;
 
     return {
-      totalDetections: detections.length,
+      totalDetections,
+      reviewedDetections,
+      uniqueFrames,
       detectionsByType,
-      detectionsByConfidence: { high: highConf, medium: mediumConf, low: lowConf },
-      manualCorrections,
-      manuallyAdded,
       averageConfidence,
+      manualCorrections,
       detectionDensity,
-      reviewProgress,
-      framesCovered: frameNumbers.size
+      reviewProgress
     };
   }, [detections, video]);
 
-  // Prepare chart data
-  const chartData = useMemo(() => {
-    const typeData = Object.entries(statistics.detectionsByType)
-      .map(([type, count]) => ({
-        name: type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-        count,
-        percentage: ((count / statistics.totalDetections) * 100).toFixed(1)
-      }))
-      .sort((a, b) => b.count - a.count);
-
-    const confidenceData = [
-      { name: 'High (≥80%)', count: statistics.detectionsByConfidence.high, color: '#10B981' },
-      { name: 'Medium (50-79%)', count: statistics.detectionsByConfidence.medium, color: '#F59E0B' },
-      { name: 'Low (<50%)', count: statistics.detectionsByConfidence.low, color: '#EF4444' }
-    ];
-
-    return { typeData, confidenceData };
-  }, [statistics]);
-
-  const getVehicleIcon = (type: string): string => {
-    const iconMap: Record<string, string> = {
-      'Bicycle': '🚲',
-      'Motorcycle': '🏍️',
-      'Electric Motorcycle': '⚡🏍️',
-      'Electric Scooter': '🛵',
-      'Motorcycle Cab': '🚖',
-      'Car': '🚗',
-      'Truck': '🚛',
-      'Bus': '🚌',
-      'Van': '🚐',
-      'Unknown': '❓'
-    };
-    return iconMap[type] || '🚗';
+  const formatDuration = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const formatTime = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  const formatConfidence = (confidence: number): string => {
+    return `${(confidence * 100).toFixed(1)}%`;
   };
 
-  if (!video || !detections.length) {
+  if (!video) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          📊 Analysis Statistics
-        </h3>
-        <div className="text-center py-8">
-          <div className="text-4xl mb-2">📈</div>
-          <p className="text-gray-500">
-            Statistics will appear here after video processing is complete.
-          </p>
+      <div className="space-y-4">
+        <div className="text-center text-gray-500 py-8">
+          <div className="text-4xl mb-2">📊</div>
+          <p>No video data available</p>
         </div>
       </div>
     );
@@ -138,180 +109,17 @@ const StatisticsPanel: React.FC<StatisticsPanelProps> = ({ video, detections }) 
   return (
     <div className="space-y-6">
       
-      {/* Overview Cards */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="stat-card">
-          <div className="stat-value text-blue-600">
-            {statistics.totalDetections}
-          </div>
-          <div className="stat-label">Total Detections</div>
-        </div>
-        
-        <div className="stat-card">
-          <div className="stat-value text-green-600">
-            {Math.round(statistics.reviewProgress)}%
-          </div>
-          <div className="stat-label">Review Progress</div>
-        </div>
-        
-        <div className="stat-card">
-          <div className="stat-value text-purple-600">
-            {(statistics.averageConfidence * 100).toFixed(1)}%
-          </div>
-          <div className="stat-label">Avg Confidence</div>
-        </div>
-        
-        <div className="stat-card">
-          <div className="stat-value text-orange-600">
-            {statistics.detectionDensity.toFixed(1)}
-          </div>
-          <div className="stat-label">Per Minute</div>
-        </div>
-      </div>
-
-      {/* Review Progress */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <h4 className="font-semibold text-gray-900 mb-3">Review Progress</h4>
-        <div className="space-y-3">
-          <div className="progress-bar">
-            <div 
-              className="progress-fill bg-green-500"
-              style={{ width: `${statistics.reviewProgress}%` }}
-            />
-          </div>
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div className="text-center">
-              <div className="font-medium text-gray-900">
-                {detections.filter(d => d.userChoice).length}
-              </div>
-              <div className="text-gray-600">Reviewed</div>
-            </div>
-            <div className="text-center">
-              <div className="font-medium text-gray-900">
-                {statistics.manualCorrections}
-              </div>
-              <div className="text-gray-600">Manual Corrections</div>
-            </div>
-            <div className="text-center">
-              <div className="font-medium text-gray-900">
-                {detections.filter(d => !d.userChoice).length}
-              </div>
-              <div className="text-gray-600">Remaining</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Detection Types Chart */}
-      {chartData.typeData.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <h4 className="font-semibold text-gray-900 mb-4">
-            Vehicle Types Detected
-          </h4>
-          
-          {/* List View */}
-          <div className="space-y-3 mb-4">
-            {chartData.typeData.slice(0, 5).map((item) => (
-              <div key={item.name} className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <span className="text-lg">{getVehicleIcon(item.name)}</span>
-                  <span className="text-sm font-medium text-gray-900">
-                    {item.name}
-                  </span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-600">{item.count}</span>
-                  <div className="w-16 h-2 bg-gray-200 rounded-full">
-                    <div 
-                      className="h-full bg-blue-500 rounded-full"
-                      style={{ width: `${item.percentage}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-gray-500 w-8 text-right">
-                    {item.percentage}%
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Bar Chart */}
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData.typeData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="name" 
-                  tick={{ fontSize: 12 }}
-                  angle={-45}
-                  textAnchor="end"
-                  height={60}
-                />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip 
-                  formatter={(value, name) => [value, 'Count']}
-                  labelFormatter={(label) => `${getVehicleIcon(label)} ${label}`}
-                />
-                <Bar dataKey="count" fill="#3B82F6" radius={[2, 2, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
-      {/* Confidence Distribution */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <h4 className="font-semibold text-gray-900 mb-4">
-          Detection Confidence Distribution
+      {/* Video Information */}
+      <div className="space-y-3">
+        <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+          <span className="mr-2">🎬</span>
+          Video Information
         </h4>
         
-        <div className="grid grid-cols-3 gap-4 mb-4">
-          {chartData.confidenceData.map((item) => (
-            <div key={item.name} className="text-center">
-              <div className="text-2xl font-bold" style={{ color: item.color }}>
-                {item.count}
-              </div>
-              <div className="text-xs text-gray-600">{item.name}</div>
-              <div className="text-xs text-gray-500">
-                {((item.count / statistics.totalDetections) * 100).toFixed(1)}%
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Pie Chart */}
-        <div className="h-40">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={chartData.confidenceData}
-                cx="50%"
-                cy="50%"
-                innerRadius={40}
-                outerRadius={70}
-                dataKey="count"
-                startAngle={90}
-                endAngle={450}
-              >
-                {chartData.confidenceData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip 
-                formatter={(value, name) => [value, 'Detections']}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Video Information */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <h4 className="font-semibold text-gray-900 mb-3">Video Information</h4>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-gray-600">Duration:</span>
-            <span className="font-medium">{formatTime(video.duration)}</span>
+            <span className="font-medium">{formatDuration(video.duration)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Resolution:</span>
@@ -327,7 +135,7 @@ const StatisticsPanel: React.FC<StatisticsPanelProps> = ({ video, detections }) 
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Frames with Detections:</span>
-            <span className="font-medium">{statistics.framesCovered.toLocaleString()}</span>
+            <span className="font-medium">{statistics.uniqueFrames}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Detection Density:</span>
@@ -336,70 +144,155 @@ const StatisticsPanel: React.FC<StatisticsPanelProps> = ({ video, detections }) 
         </div>
       </div>
 
-      {/* Quality Metrics */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <h4 className="font-semibold text-gray-900 mb-3">Quality Metrics</h4>
-        <div className="space-y-3">
-          
-          {/* Model Accuracy */}
-          <div>
-            <div className="flex justify-between text-sm mb-1">
-              <span className="text-gray-600">Model Accuracy</span>
-              <span className="font-medium">
-                {(statistics.averageConfidence * 100).toFixed(1)}%
-              </span>
-            </div>
-            <div className="progress-bar">
-              <div 
-                className="progress-fill bg-blue-500"
-                style={{ width: `${statistics.averageConfidence * 100}%` }}
-              />
-            </div>
+      {/* Detection Summary */}
+      <div className="space-y-3">
+        <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+          <span className="mr-2">🎯</span>
+          Detection Summary
+        </h4>
+        
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-600">Total Detections:</span>
+            <span className="font-medium text-blue-600">{statistics.totalDetections}</span>
           </div>
-
-          {/* Manual Intervention Rate */}
-          <div>
-            <div className="flex justify-between text-sm mb-1">
-              <span className="text-gray-600">Manual Corrections</span>
-              <span className="font-medium">
-                {statistics.totalDetections > 0 
-                  ? ((statistics.manualCorrections / statistics.totalDetections) * 100).toFixed(1)
-                  : 0}%
-              </span>
-            </div>
-            <div className="progress-bar">
-              <div 
-                className="progress-fill bg-yellow-500"
-                style={{ 
-                  width: `${statistics.totalDetections > 0 
-                    ? (statistics.manualCorrections / statistics.totalDetections) * 100 
-                    : 0}%` 
-                }}
-              />
-            </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Reviewed:</span>
+            <span className="font-medium text-green-600">{statistics.reviewedDetections}</span>
           </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Remaining:</span>
+            <span className="font-medium text-orange-600">{statistics.totalDetections - statistics.reviewedDetections}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Manual Corrections:</span>
+            <span className="font-medium text-purple-600">{statistics.manualCorrections}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Average Confidence:</span>
+            <span className="font-medium">{formatConfidence(statistics.averageConfidence)}</span>
+          </div>
+        </div>
 
-          {/* Processing Efficiency */}
-          <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-200">
-            <div className="text-center">
-              <div className="text-lg font-bold text-green-600">
-                {statistics.totalDetections > 0 
-                  ? (100 - ((statistics.manualCorrections / statistics.totalDetections) * 100)).toFixed(1)
-                  : 100}%
-              </div>
-              <div className="text-xs text-gray-600">Auto-Accuracy</div>
-            </div>
-            <div className="text-center">
-              <div className="text-lg font-bold text-blue-600">
-                {statistics.framesCovered > 0 
-                  ? ((statistics.totalDetections / statistics.framesCovered) * 100).toFixed(1)
-                  : 0}%
-              </div>
-              <div className="text-xs text-gray-600">Frame Efficiency</div>
-            </div>
+        {/* Progress Bar */}
+        <div className="mt-4">
+          <div className="flex justify-between text-xs text-gray-600 mb-1">
+            <span>Review Progress</span>
+            <span>{Math.round(statistics.reviewProgress)}%</span>
+          </div>
+          <div className="progress-container h-2">
+            <div 
+              className="progress-bar bg-blue-500"
+              style={{ width: `${statistics.reviewProgress}%` }}
+            />
           </div>
         </div>
       </div>
+
+      {/* Vehicle Types Breakdown */}
+      {Object.keys(statistics.detectionsByType).length > 0 && (
+        <div className="space-y-3">
+          <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+            <span className="mr-2">🚗</span>
+            Vehicle Types
+          </h4>
+          
+          <div className="space-y-2">
+            {Object.entries(statistics.detectionsByType)
+              .sort((a, b) => b[1] - a[1])
+              .map(([type, count]) => {
+                const percentage = statistics.totalDetections > 0 
+                  ? (count / statistics.totalDetections) * 100 
+                  : 0;
+                
+                const getVehicleIcon = (vehicleType: string): string => {
+                  const iconMap: Record<string, string> = {
+                    'car': '🚗',
+                    'truck': '🚛',
+                    'bus': '🚌',
+                    'motorcycle': '🏍️',
+                    'bicycle': '🚲',
+                    'electric bike': '⚡🚲',
+                    'electric scooter': '🛵',
+                    'van': '🚐',
+                    'unknown': '❓'
+                  };
+                  return iconMap[vehicleType] || '🚗';
+                };
+
+                return (
+                  <div key={type} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <span>{getVehicleIcon(type)}</span>
+                      <span className="text-sm capitalize">{type}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm font-medium">{count}</span>
+                      <span className="text-xs text-gray-500">({percentage.toFixed(1)}%)</span>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
+
+      {/* Performance Metrics */}
+      <div className="space-y-3">
+        <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+          <span className="mr-2">⚡</span>
+          Performance
+        </h4>
+        
+        <div className="grid grid-cols-2 gap-3">
+          <div className="text-center p-3 bg-blue-50 rounded-lg">
+            <div className="text-lg font-bold text-blue-600">{statistics.uniqueFrames}</div>
+            <div className="text-xs text-blue-700">Active Frames</div>
+          </div>
+          <div className="text-center p-3 bg-green-50 rounded-lg">
+            <div className="text-lg font-bold text-green-600">{statistics.detectionDensity.toFixed(1)}</div>
+            <div className="text-xs text-green-700">Per Minute</div>
+          </div>
+          <div className="text-center p-3 bg-purple-50 rounded-lg">
+            <div className="text-lg font-bold text-purple-600">{formatConfidence(statistics.averageConfidence)}</div>
+            <div className="text-xs text-purple-700">Avg Confidence</div>
+          </div>
+          <div className="text-center p-3 bg-orange-50 rounded-lg">
+            <div className="text-lg font-bold text-orange-600">{Math.round(statistics.reviewProgress)}%</div>
+            <div className="text-xs text-orange-700">Complete</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quality Indicators */}
+      <div className="space-y-3">
+        <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+          <span className="mr-2">🏆</span>
+          Quality Metrics
+        </h4>
+        
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-600">Frame Coverage:</span>
+            <span className="font-medium">
+              {video.frameCount > 0 ? ((statistics.uniqueFrames / video.frameCount) * 100).toFixed(1) : 0}%
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Manual Intervention:</span>
+            <span className="font-medium">
+              {statistics.totalDetections > 0 ? ((statistics.manualCorrections / statistics.totalDetections) * 100).toFixed(1) : 0}%
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Avg Objects per Frame:</span>
+            <span className="font-medium">
+              {statistics.uniqueFrames > 0 ? (statistics.totalDetections / statistics.uniqueFrames).toFixed(1) : 0}
+            </span>
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 };

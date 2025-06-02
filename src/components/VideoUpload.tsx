@@ -4,13 +4,11 @@ import { DetectionMode } from '../types';
 interface VideoUploadProps {
   onVideoUpload: (file: File) => void;
   detectionMode: DetectionMode;
-  onResumeFromExcel?: (videoFile: File, excelData: any) => void;
 }
 
 const VideoUpload: React.FC<VideoUploadProps> = ({ 
   onVideoUpload, 
-  detectionMode, 
-  onResumeFromExcel 
+  detectionMode
 }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -110,13 +108,13 @@ const VideoUpload: React.FC<VideoUploadProps> = ({
         return {
           emoji: '🛴',
           title: 'Micro-Mobility Detection',
-          description: 'Specialized detection for bicycles, e-scooters, motorcycles, and motorcycle cabs'
+          description: 'Bicycles, e-scooters, motorcycles, and motorcycle cabs'
         };
       case DetectionMode.ALL_VEHICLES:
         return {
           emoji: '🚗',
           title: 'All Vehicle Detection', 
-          description: 'Comprehensive detection for all vehicle types including cars, trucks, and buses'
+          description: 'Cars, trucks, buses + micro-mobility vehicles'
         };
       default:
         return {
@@ -130,86 +128,30 @@ const VideoUpload: React.FC<VideoUploadProps> = ({
   const modeInfo = getDetectionModeDescription();
 
   return (
-    <div className="container-narrow py-12">
+    <div className="max-w-4xl mx-auto">
       
-      {/* Floating Status Badge */}
-      <div className="flex justify-center mb-8">
-        <div className="inline-flex items-center space-x-3 px-6 py-3 bg-white/20 backdrop-blur-xl text-white rounded-full border border-white/20 shadow-lg">
-          <div className="w-3 h-3 bg-emerald-400 rounded-full animate-pulse"></div>
-          <span className="font-medium">AI Detection Engine Ready</span>
-          <span className="text-lg">🎯</span>
-        </div>
-      </div>
-      
-      {/* Hero Section with Enhanced Typography */}
-      <div className="text-center space-y-8 mb-12">
-        <div className="space-y-4">
-          <h1 className="text-5xl md:text-7xl font-bold text-white leading-tight">
-            Upload Video for
-            <span className="block mt-2">
-              <span className="hero-gradient-text bg-gradient-to-r from-yellow-300 via-pink-300 to-blue-300 bg-clip-text text-transparent">
-                Smart Analysis
-              </span>
-            </span>
-          </h1>
-          
-          <div className="max-w-2xl mx-auto">
-            <div className="inline-flex items-center space-x-3 px-6 py-3 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20">
-              <span className="text-2xl">{modeInfo.emoji}</span>
-              <div className="text-left">
-                <div className="font-semibold text-white">{modeInfo.title}</div>
-                <div className="text-sm text-white/80">{modeInfo.description}</div>
-              </div>
+      {/* Detection Mode Info */}
+      <div className="card mb-8">
+        <div className="card-body text-center">
+          <div className="flex items-center justify-center space-x-3 mb-4">
+            <span className="text-3xl">{modeInfo.emoji}</span>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">{modeInfo.title}</h3>
+              <p className="text-sm text-gray-600">{modeInfo.description}</p>
             </div>
           </div>
         </div>
-        
-        <p className="text-xl text-white/90 max-w-3xl mx-auto font-medium">
-          Our advanced YOLOv8m AI will analyze your video frame by frame, 
-          detecting and classifying vehicles with <strong>88% accuracy</strong> and 
-          professional-grade precision.
-        </p>
       </div>
 
-      {/* Enhanced Features Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        <div className="stat-card text-center group">
-          <div className="text-4xl mb-4 transition-transform duration-300 group-hover:scale-110">⚡</div>
-          <h3 className="font-bold text-gray-900 mb-2 text-lg">Lightning Fast</h3>
-          <p className="text-sm text-gray-600 leading-relaxed">
-            GPU-accelerated inference with real-time progress tracking
-          </p>
-          <div className="mt-3 text-xs text-blue-600 font-semibold">~15-25 FPS</div>
-        </div>
-        
-        <div className="stat-card text-center group">
-          <div className="text-4xl mb-4 transition-transform duration-300 group-hover:scale-110">🎯</div>
-          <h3 className="font-bold text-gray-900 mb-2 text-lg">Precision AI</h3>
-          <p className="text-sm text-gray-600 leading-relaxed">
-            State-of-the-art YOLOv8m model with proven accuracy
-          </p>
-          <div className="mt-3 text-xs text-emerald-600 font-semibold">88% F1 Score</div>
-        </div>
-        
-        <div className="stat-card text-center group">
-          <div className="text-4xl mb-4 transition-transform duration-300 group-hover:scale-110">📊</div>
-          <h3 className="font-bold text-gray-900 mb-2 text-lg">Rich Analytics</h3>
-          <p className="text-sm text-gray-600 leading-relaxed">
-            Comprehensive Excel reports with charts and metadata
-          </p>
-          <div className="mt-3 text-xs text-purple-600 font-semibold">Export Ready</div>
-        </div>
-      </div>
-
-      {/* Revolutionary Upload Area */}
-      <div className="card scale-in">
+      {/* Upload Area */}
+      <div className="card">
         <div className="card-body">
           <div
             ref={dropZoneRef}
             onDrop={handleDrop}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
-            className={`upload-zone flex flex-col items-center justify-center p-12 relative overflow-hidden ${
+            className={`upload-zone flex flex-col items-center justify-center p-12 ${
               isDragOver ? 'active' : isUploading ? 'uploading' : ''
             }`}
           >
@@ -227,25 +169,20 @@ const VideoUpload: React.FC<VideoUploadProps> = ({
             />
 
             {!isUploading ? (
-              <div className="text-center space-y-8 relative z-10">
-                <div className="relative">
-                  <div className={`text-8xl transition-all duration-500 ${
-                    isDragOver ? 'scale-125 rotate-12' : 'scale-100 rotate-0'
-                  }`}>
-                    {isDragOver ? '🎯' : '📹'}
-                  </div>
-                  {isDragOver && (
-                    <div className="absolute inset-0 bg-blue-400/20 rounded-full animate-ping"></div>
-                  )}
+              <div className="text-center space-y-6">
+                <div className={`text-6xl transition-all duration-300 ${
+                  isDragOver ? 'scale-110' : 'scale-100'
+                }`}>
+                  {isDragOver ? '🎯' : '📹'}
                 </div>
                 
-                <div className="space-y-4">
-                  <h3 className="text-3xl font-bold text-white">
-                    {isDragOver ? 'Perfect! Drop it here' : 'Choose Your Video'}
+                <div className="space-y-3">
+                  <h3 className="text-2xl font-semibold text-gray-900">
+                    {isDragOver ? 'Drop your video here' : 'Choose Your Video'}
                   </h3>
-                  <p className="text-lg text-white/80 max-w-md mx-auto">
+                  <p className="text-gray-600 max-w-md mx-auto">
                     {isDragOver 
-                      ? 'Release to start the magic ✨' 
+                      ? 'Release to start the analysis' 
                       : 'Drag and drop your video file, or click below to browse'
                     }
                   </p>
@@ -254,43 +191,32 @@ const VideoUpload: React.FC<VideoUploadProps> = ({
                 <div className="space-y-4">
                   <button
                     onClick={openFileDialog}
-                    className="btn btn-primary btn-xl group"
+                    className="btn btn-primary btn-xl"
                   >
-                    <span className="mr-3 text-xl group-hover:scale-110 transition-transform">📁</span>
+                    <span className="mr-2">📁</span>
                     Select Video File
-                    <span className="ml-3 opacity-0 group-hover:opacity-100 transition-opacity">→</span>
                   </button>
                   
-                  <div className="text-sm text-white/70 space-y-2">
-                    <div className="flex items-center justify-center space-x-4">
-                      <span>📋 {supportedFormats.join(', ')}</span>
-                      <span>•</span>
-                      <span>📦 Max: {formatFileSize(maxFileSize)}</span>
-                    </div>
-                    <div className="flex items-center justify-center space-x-2">
-                      <span className="w-2 h-2 bg-emerald-400 rounded-full"></span>
-                      <span>Secure upload with automatic processing</span>
-                    </div>
+                  <div className="text-sm text-gray-500 space-y-1">
+                    <p>Supported formats: {supportedFormats.join(', ')}</p>
+                    <p>Maximum file size: {formatFileSize(maxFileSize)}</p>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="text-center space-y-8 w-full max-w-md relative z-10">
-                <div className="relative">
-                  <div className="text-6xl animate-bounce">🚀</div>
-                  <div className="absolute inset-0 bg-emerald-400/20 rounded-full animate-ping"></div>
-                </div>
+              <div className="text-center space-y-6 w-full max-w-md">
+                <div className="text-5xl">⏳</div>
                 
-                <div className="space-y-4">
-                  <h3 className="text-2xl font-bold text-white">
+                <div className="space-y-3">
+                  <h3 className="text-xl font-semibold text-gray-900">
                     Uploading Your Video
                   </h3>
-                  <p className="text-white/80">
+                  <p className="text-gray-600">
                     Preparing for AI analysis...
                   </p>
                 </div>
                 
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <div className="progress-container">
                     <div 
                       className="progress-bar"
@@ -298,36 +224,29 @@ const VideoUpload: React.FC<VideoUploadProps> = ({
                     />
                   </div>
                   
-                  <div className="flex justify-between items-center text-sm text-white/80">
+                  <div className="flex justify-between items-center text-sm text-gray-600">
                     <span>{Math.round(uploadProgress)}% complete</span>
                     <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                      <div className="loading-spinner"></div>
                       <span>Processing...</span>
                     </div>
                   </div>
                 </div>
               </div>
             )}
-
-            {/* Animated Background Elements */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-              <div className="absolute -top-4 -right-4 w-24 h-24 bg-blue-400/10 rounded-full animate-pulse"></div>
-              <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-purple-400/10 rounded-full animate-pulse delay-1000"></div>
-              <div className="absolute top-1/2 left-1/4 w-16 h-16 bg-pink-400/10 rounded-full animate-pulse delay-500"></div>
-            </div>
           </div>
 
-          {/* Enhanced Error Display */}
+          {/* Error Display */}
           {error && (
-            <div className="mt-6 p-6 bg-red-500/10 backdrop-blur-xl border border-red-300/30 rounded-2xl">
-              <div className="flex items-start space-x-4">
-                <div className="text-2xl">⚠️</div>
+            <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-start space-x-3">
+                <div className="text-xl">⚠️</div>
                 <div className="flex-1">
-                  <div className="font-semibold text-red-300 mb-2">Upload Error</div>
-                  <p className="text-red-200 text-sm leading-relaxed">{error}</p>
+                  <div className="font-medium text-red-800 mb-1">Upload Error</div>
+                  <p className="text-red-700 text-sm">{error}</p>
                   <button
                     onClick={() => setError(null)}
-                    className="mt-3 text-xs text-red-300 hover:text-red-100 underline"
+                    className="mt-2 text-xs text-red-600 hover:text-red-800 underline"
                   >
                     Try again
                   </button>
@@ -338,23 +257,21 @@ const VideoUpload: React.FC<VideoUploadProps> = ({
         </div>
       </div>
 
-      {/* Additional Info Section */}
-      <div className="mt-12 text-center">
+      {/* Security & Privacy Info */}
+      <div className="mt-8 text-center">
         <div className="card card-compact inline-block">
-          <div className="p-6">
-            <div className="flex items-center space-x-4 text-sm text-gray-600">
+          <div className="p-4">
+            <div className="flex items-center justify-center space-x-6 text-sm text-gray-600">
               <div className="flex items-center space-x-2">
-                <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
-                <span>End-to-end encrypted</span>
+                <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                <span>Secure upload</span>
               </div>
-              <div className="w-1 h-4 bg-gray-300 rounded"></div>
               <div className="flex items-center space-x-2">
-                <span className="w-2 h-2 bg-emerald-400 rounded-full"></span>
+                <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
                 <span>Auto-delete after 7 days</span>
               </div>
-              <div className="w-1 h-4 bg-gray-300 rounded"></div>
               <div className="flex items-center space-x-2">
-                <span className="w-2 h-2 bg-purple-400 rounded-full"></span>
+                <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
                 <span>GDPR compliant</span>
               </div>
             </div>
