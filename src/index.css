@@ -1,0 +1,183 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Modern app design system */
+:root {
+  --primary-50: #eff6ff;
+  --primary-100: #dbeafe;
+  --primary-500: #3b82f6;
+  --primary-600: #2563eb;
+  --primary-700: #1d4ed8;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-900: #111827;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  color: var(--gray-700);
+  line-height: 1.6;
+}
+
+#root {
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* Remove any background images */
+body::before,
+body::after,
+*::before,
+*::after {
+  background-image: none !important;
+}
+
+/* Modern button system */
+.btn {
+  @apply inline-flex items-center justify-center px-4 py-2.5 text-sm font-medium rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-primary {
+  @apply bg-blue-600 text-white hover:bg-blue-700 shadow-md hover:shadow-lg focus:ring-blue-500 transform hover:-translate-y-0.5;
+}
+
+.btn-secondary {
+  @apply bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 shadow-sm hover:shadow-md focus:ring-gray-500;
+}
+
+.btn-outline {
+  @apply bg-transparent text-blue-600 border-2 border-blue-200 hover:bg-blue-50 focus:ring-blue-500;
+}
+
+.btn-sm {
+  @apply px-3 py-2 text-sm;
+}
+
+.btn-lg {
+  @apply px-6 py-3 text-base font-semibold;
+}
+
+.btn-xl {
+  @apply px-8 py-4 text-lg font-semibold;
+}
+
+/* Modern card system */
+.card {
+  @apply bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden backdrop-blur-sm;
+}
+
+.card-body {
+  @apply p-6;
+}
+
+.card-header {
+  @apply px-6 py-4 bg-gray-50 border-b border-gray-100;
+}
+
+/* Glass effect cards */
+.glass-card {
+  @apply bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20;
+}
+
+/* Progress bars */
+.progress-container {
+  @apply w-full bg-gray-100 rounded-full h-3 overflow-hidden;
+}
+
+.progress-bar {
+  @apply h-full bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-500 ease-out relative;
+}
+
+.progress-bar::after {
+  content: '';
+  @apply absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse;
+}
+
+/* Upload areas */
+.upload-zone {
+  @apply relative border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50/50 hover:border-blue-300 hover:bg-blue-50/50 transition-all duration-300 cursor-pointer;
+}
+
+.upload-zone.active {
+  @apply border-blue-400 bg-blue-50 shadow-lg;
+}
+
+.upload-zone.uploading {
+  @apply border-green-400 bg-green-50;
+}
+
+/* Stats and metrics */
+.stat-card {
+  @apply bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200 hover:border-blue-200;
+}
+
+.stat-number {
+  @apply text-3xl font-bold text-gray-900;
+}
+
+.stat-label {
+  @apply text-sm text-gray-600 mt-2;
+}
+
+/* Animations */
+.fade-in {
+  animation: fadeIn 0.6s ease-out forwards;
+}
+
+.slide-up {
+  animation: slideUp 0.5s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Remove default styles */
+select, input, button {
+  @apply focus:outline-none;
+}
+
+/* Modern form controls */
+.form-select {
+  @apply bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors;
+}
+
+.form-input {
+  @apply bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors;
+}
+
+/* Hide scrollbars but keep functionality */
+.custom-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Responsive utilities */
+@media (max-width: 768px) {
+  .container {
+    @apply px-4;
+  }
+}
