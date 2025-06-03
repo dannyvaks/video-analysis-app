@@ -374,6 +374,7 @@ async def export_to_excel(export_data: dict):
                 id=det_dict['id'],
                 timestamp=det_dict['timestamp'],
                 frame_number=det_dict['frameNumber'],
+                full_frame_image_data=det_dict.get('fullFrameImageData', ''),
                 frame_image_data=det_dict['frameImageData'],
                 bbox=det_dict['boundingBox'],
                 model_suggestions=det_dict['modelSuggestions'],
@@ -466,6 +467,7 @@ async def internal_error_handler(request, exc):
 
 import cv2
 import base64
+import numpy as np
 from io import BytesIO
 from PIL import Image
 
@@ -517,8 +519,8 @@ async def resume_analysis(
         logger.info(f"📊 Parsing Excel file...")
         
         # Helper function to extract frame from video
-        def extract_frame_image(video_path: str, frame_number: int, bbox: dict) -> str:
-            """Extract frame image and crop to bounding box"""
+        def extract_frame_images(video_path: str, frame_number: int, bbox: dict) -> tuple[str, str]:
+            """Extract full frame with bbox overlay and crop image"""
             try:
                 cap = cv2.VideoCapture(video_path)
                 cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
@@ -526,25 +528,84 @@ async def resume_analysis(
                 cap.release()
                 
                 if not ret:
-                    return ""
+                    return "", ""
                 
-                # Crop frame to bounding box (with some padding)
+                # Create full frame with bounding box overlay
+                full_frame = frame.copy()
+                x1, y1 = int(bbox['x']), int(bbox['y'])
+                x2, y2 = x1 + int(bbox['width']), y1 + int(bbox['height'])
+                
+                # Draw green bounding box
+                cv2.rectangle(full_frame, (x1, y1), (x2, y2), (0, 255, 0), 3)
+                
+                # Add label
+                label = f"Detection: Frame {frame_number}"
+                label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
+                cv2.rectangle(full_frame, 
+                             (x1, y1 - label_size[1] - 10), 
+                             (x1 + label_size[0], y1), 
+                             (0, 255, 0), -1)
+                cv2.putText(full_frame, label, 
+                           (x1, y1 - 5), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+                
+                # Resize full frame if too large
+                h, w = full_frame.shape[:2]
+                if max(h, w) > 800:
+                    scale = 800 / max(h, w)
+                    new_w, new_h = int(w * scale), int(h * scale)
+                    full_frame = cv2.resize(full_frame, (new_w, new_h))
+                
+                # Convert full frame to base64
+                _, buffer = cv2.imencode('.jpg', full_frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
+                full_frame_b64 = base64.b64encode(buffer).decode('utf-8')
+                full_frame_data = f"data:image/jpeg;base64,{full_frame_b64}"
+                
+                # Create crop with padding
                 height, width = frame.shape[:2]
-                x = max(0, int(bbox['x'] - bbox['width'] * 0.1))
-                y = max(0, int(bbox['y'] - bbox['height'] * 0.1))
-                w = min(width - x, int(bbox['width'] * 1.2))
-                h = min(height - y, int(bbox['height'] * 1.2))
+                bbox_area = bbox['width'] * bbox['height']
+                padding_ratio = max(0.2, min(0.5, 5000 / bbox_area))
                 
-                cropped_frame = frame[y:y+h, x:x+w]
+                pad_w = bbox['width'] * padding_ratio
+                pad_h = bbox['height'] * padding_ratio
                 
-                # Convert to base64
-                _, buffer = cv2.imencode('.jpg', cropped_frame)
-                img_base64 = base64.b64encode(buffer).decode('utf-8')
-                return f"data:image/jpeg;base64,{img_base64}"
+                crop_x1 = max(0, int(bbox['x'] - pad_w))
+                crop_y1 = max(0, int(bbox['y'] - pad_h))
+                crop_x2 = min(width, int(bbox['x'] + bbox['width'] + pad_w))
+                crop_y2 = min(height, int(bbox['y'] + bbox['height'] + pad_h))
+                
+                # Extract and resize crop to 224x224
+                crop = frame[crop_y1:crop_y2, crop_x1:crop_x2]
+                if crop.size > 0:
+                    # Resize maintaining aspect ratio
+                    crop_h, crop_w = crop.shape[:2]
+                    target_size = 224
+                    
+                    if crop_h > crop_w:
+                        new_h, new_w = target_size, int(crop_w * target_size / crop_h)
+                    else:
+                        new_h, new_w = int(crop_h * target_size / crop_w), target_size
+                    
+                    resized_crop = cv2.resize(crop, (new_w, new_h))
+                    
+                    # Center in 224x224 canvas
+                    final_crop = np.zeros((target_size, target_size, 3), dtype=np.uint8)
+                    y_offset = (target_size - new_h) // 2
+                    x_offset = (target_size - new_w) // 2
+                    final_crop[y_offset:y_offset + new_h, x_offset:x_offset + new_w] = resized_crop
+                else:
+                    final_crop = np.zeros((224, 224, 3), dtype=np.uint8)
+                
+                # Convert crop to base64
+                _, buffer = cv2.imencode('.jpg', final_crop, [cv2.IMWRITE_JPEG_QUALITY, 90])
+                crop_b64 = base64.b64encode(buffer).decode('utf-8')
+                crop_data = f"data:image/jpeg;base64,{crop_b64}"
+                
+                return full_frame_data, crop_data
                 
             except Exception as e:
                 logger.warning(f"Failed to extract frame {frame_number}: {str(e)}")
-                return ""
+                return "", ""
         
         try:
             # Read the Excel file - try specific sheet name first
@@ -693,15 +754,16 @@ async def resume_analysis(
                         'height': float(bbox_height)
                     }
                     
-                    # Extract frame image for this detection
-                    frame_image_data = extract_frame_image(video_path, int(frame_number), bbox)
+                    # Extract both full frame and crop images for this detection
+                    full_frame_data, crop_data = extract_frame_images(video_path, int(frame_number), bbox)
                     
                     # Create detection with proper frontend structure
                     detection = {
                         "id": str(detection_id),
                         "frameNumber": int(frame_number),
                         "timestamp": parse_timestamp(timestamp_raw),
-                        "frameImageData": frame_image_data,  # Now includes extracted frame
+                        "fullFrameImageData": full_frame_data,  # Full frame with bbox
+                        "frameImageData": crop_data,  # 224x224 crop
                         "boundingBox": bbox,
                         "modelSuggestions": [{
                             "type": str(object_type),
@@ -722,7 +784,7 @@ async def resume_analysis(
                     logger.warning(f"⚠️ Skipped row {idx}: {str(e)}")
                     continue
             
-            logger.info(f"✅ Parsed {len(detections)} detections with frame images")
+            logger.info(f"✅ Parsed {len(detections)} detections with full frame and crop images")
             
             # Create video metadata with proper frontend structure
             video_metadata = {
@@ -747,7 +809,7 @@ async def resume_analysis(
             
             return {
                 "status": "success",
-                "message": f"Resumed analysis from Excel with {len(detections)} detections and extracted frames",
+                "message": f"Resumed analysis from Excel with {len(detections)} detections (full frames + crops)",
                 "video": video_metadata,
                 "detections": detections,
                 "detection_mode": detection_mode,

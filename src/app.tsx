@@ -3,7 +3,6 @@ import {
   AppState, 
   VideoMetadata, 
   Detection, 
-  DetectionMode, 
   ProcessingProgress,
   ModelLoadingProgress,
   AppError 
@@ -30,7 +29,6 @@ const App: React.FC = () => {
     video: null,
     detections: [],
     currentDetectionIndex: 0,
-    detectionMode: DetectionMode.ALL_VEHICLES,
     modelLoaded: false,
     isProcessing: false,
     processingProgress: null,
@@ -234,7 +232,7 @@ const App: React.FC = () => {
       }));
 
       // Start processing with backend
-      await startVideoProcessing(filePath, appState.detectionMode, 30);
+      await startVideoProcessing(filePath, 30);
 
       console.log('✅ Video processing started');
       
@@ -254,7 +252,7 @@ const App: React.FC = () => {
         processingProgress: null
       }));
     }
-  }, [appState.detectionMode]);
+  }, []);
 
   const handleDetectionChoice = useCallback((detectionId: string, choice: any) => {
     setAppState(prev => {
@@ -289,13 +287,6 @@ const App: React.FC = () => {
     console.log('✅ Export completed');
   }, []);
 
-  const handleDetectionModeChange = useCallback((mode: DetectionMode) => {
-    setAppState(prev => ({
-      ...prev,
-      detectionMode: mode
-    }));
-  }, []);
-
   const handleRetry = useCallback(() => {
     setError(null);
     
@@ -323,7 +314,6 @@ const App: React.FC = () => {
       video: null,
       detections: [],
       currentDetectionIndex: 0,
-      detectionMode: appState.detectionMode,
       modelLoaded: appState.modelLoaded,
       isProcessing: false,
       processingProgress: null,
@@ -331,7 +321,7 @@ const App: React.FC = () => {
     });
     setError(null);
     setUploadedFilePath(null);
-  }, [appState.detectionMode, appState.modelLoaded]);
+  }, [appState.modelLoaded]);
 
   // Fix the resume handler
   const handleResumeSuccess = (data: any) => {
@@ -346,7 +336,6 @@ const App: React.FC = () => {
         ...prev,
         video: data.video,
         detections: data.detections || [],
-        detectionMode: data.detection_mode || DetectionMode.ALL_VEHICLES,
         currentStep: 'review',
         currentDetectionIndex: 0,
         isProcessing: false,
@@ -386,8 +375,6 @@ const App: React.FC = () => {
         <Header 
           currentStep={appState.currentStep}
           onStartOver={handleStartOver}
-          detectionMode={appState.detectionMode}
-          onDetectionModeChange={handleDetectionModeChange}
         />
         
         <div className="container-center py-12">
@@ -408,8 +395,6 @@ const App: React.FC = () => {
         <Header 
           currentStep={appState.currentStep}
           onStartOver={handleStartOver}
-          detectionMode={appState.detectionMode}
-          onDetectionModeChange={handleDetectionModeChange}
         />
         
         <div className="container-center py-12">
@@ -433,8 +418,6 @@ const App: React.FC = () => {
       <Header 
         currentStep={appState.currentStep}
         onStartOver={handleStartOver}
-        detectionMode={appState.detectionMode}
-        onDetectionModeChange={handleDetectionModeChange}
       />
 
       {/* Main Content */}
@@ -488,7 +471,6 @@ const App: React.FC = () => {
               {/* Upload Component */}
               <VideoUpload 
                 onVideoUpload={handleVideoUpload}
-                detectionMode={appState.detectionMode}
               />
               
               {/* Resume Section */}
@@ -571,7 +553,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* Review Step */}
+        {/* Review Step - FIXED: Full width layout with integrated sidebar */}
         {appState.currentStep === 'review' && (
           <div className="container-wide py-12">
             <div className="fade-in">
@@ -589,55 +571,47 @@ const App: React.FC = () => {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
-                {/* Main Detection Review */}
-                <div className="xl:col-span-3">
-                  <div className="card">
-                    <div className="card-body">
-                      <DetectionReview
-                        detections={appState.detections}
-                        currentIndex={appState.currentDetectionIndex}
-                        onDetectionChoice={handleDetectionChoice}
-                        onIndexChange={(index) => setAppState(prev => ({ ...prev, currentDetectionIndex: index }))}
-                      />
-                    </div>
+              {/* Main Detection Review - FIXED: Full width layout */}
+              <DetectionReview
+                detections={appState.detections}
+                currentIndex={appState.currentDetectionIndex}
+                onDetectionChoice={handleDetectionChoice}
+                onIndexChange={(index) => setAppState(prev => ({ ...prev, currentDetectionIndex: index }))}
+              />
+
+              {/* Statistics and Export - FIXED: Below main content */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-12 max-w-6xl mx-auto">
+                {/* Statistics Panel */}
+                <div className="card">
+                  <div className="card-header">
+                    <h3 className="text-xl font-semibold text-gray-900 flex items-center">
+                      <span className="mr-2">📊</span>
+                      Statistics
+                    </h3>
+                  </div>
+                  <div className="card-body">
+                    <StatisticsPanel 
+                      video={appState.video}
+                      detections={appState.detections}
+                    />
                   </div>
                 </div>
                 
-                {/* Sidebar */}
-                <div className="xl:col-span-1 space-y-6">
-                  {/* Statistics Panel */}
-                  <div className="card">
-                    <div className="card-header">
-                      <h3 className="font-semibold text-gray-900 flex items-center">
-                        <span className="mr-2">📊</span>
-                        Statistics
-                      </h3>
-                    </div>
-                    <div className="card-body">
-                      <StatisticsPanel 
-                        video={appState.video}
-                        detections={appState.detections}
-                      />
-                    </div>
+                {/* Export Panel */}
+                <div className="card">
+                  <div className="card-header">
+                    <h3 className="text-xl font-semibold text-gray-900 flex items-center">
+                      <span className="mr-2">📤</span>
+                      Export
+                    </h3>
                   </div>
-                  
-                  {/* Export Panel */}
-                  <div className="card">
-                    <div className="card-header">
-                      <h3 className="font-semibold text-gray-900 flex items-center">
-                        <span className="mr-2">📤</span>
-                        Export
-                      </h3>
-                    </div>
-                    <div className="card-body">
-                      <ExportInterface
-                        video={appState.video}
-                        detections={appState.detections}
-                        onExport={handleExport}
-                        onStartOver={handleStartOver}
-                      />
-                    </div>
+                  <div className="card-body">
+                    <ExportInterface
+                      video={appState.video}
+                      detections={appState.detections}
+                      onExport={handleExport}
+                      onStartOver={handleStartOver}
+                    />
                   </div>
                 </div>
               </div>

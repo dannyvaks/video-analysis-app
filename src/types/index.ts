@@ -83,13 +83,12 @@ export interface UserChoice {
 // Vehicle type type
 export type VehicleType = string;
 
-// Main application state interface - FIXED
+// Main application state interface
 export interface AppState {
   currentStep: 'upload' | 'processing' | 'review' | 'export';
   video: VideoMetadata | null;
   detections: Detection[];
   currentDetectionIndex: number;
-  detectionMode: DetectionMode; // ✅ Fixed: This should be DetectionMode, not DetectionMode.ALL_VEHICLES
   modelLoaded: boolean;
   isProcessing: boolean;
   processingProgress: ProcessingProgress | null;

@@ -1,14 +1,11 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { DetectionMode } from '../types';
 
 interface VideoUploadProps {
   onVideoUpload: (file: File) => void;
-  detectionMode: DetectionMode;
 }
 
 const VideoUpload: React.FC<VideoUploadProps> = ({ 
-  onVideoUpload, 
-  detectionMode
+  onVideoUpload
 }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -56,7 +53,6 @@ const VideoUpload: React.FC<VideoUploadProps> = ({
       setIsUploading(true);
       setUploadProgress(0);
 
-      // Realistic progress simulation
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => {
           if (prev >= 85) {
@@ -67,7 +63,6 @@ const VideoUpload: React.FC<VideoUploadProps> = ({
         });
       }, 300);
 
-      // Actual upload happens in parent component
       onVideoUpload(file);
       
     } catch (error) {
@@ -102,50 +97,33 @@ const VideoUpload: React.FC<VideoUploadProps> = ({
     fileInputRef.current?.click();
   }, []);
 
-  const getDetectionModeDescription = () => {
-    switch (detectionMode) {
-      case DetectionMode.MICRO_MOBILITY:
-        return {
-          emoji: '🛴',
-          title: 'Micro-Mobility Detection',
-          description: 'Bicycles, e-scooters, motorcycles, and motorcycle cabs'
-        };
-      case DetectionMode.ALL_VEHICLES:
-        return {
-          emoji: '🚗',
-          title: 'All Vehicle Detection', 
-          description: 'Cars, trucks, buses + micro-mobility vehicles'
-        };
-      default:
-        return {
-          emoji: '🔍',
-          title: 'Smart Detection',
-          description: 'AI-powered vehicle detection and classification'
-        };
-    }
-  };
-
-  const modeInfo = getDetectionModeDescription();
-
   return (
     <div className="max-w-4xl mx-auto">
       
-      {/* Detection Mode Info */}
-      <div className="card mb-8">
-        <div className="card-body text-center">
-          <div className="flex items-center justify-center space-x-3 mb-4">
-            <span className="text-3xl">{modeInfo.emoji}</span>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">{modeInfo.title}</h3>
-              <p className="text-sm text-gray-600">{modeInfo.description}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Upload Area */}
       <div className="card">
         <div className="card-body">
+          {/* FIXED: Absolutely hidden file input with proper styling */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={supportedFormats.join(',')}
+            onChange={(e) => {
+              const files = e.target.files;
+              if (files && files.length > 0) {
+                handleFileSelect(files[0]);
+              }
+            }}
+            style={{ 
+              position: 'absolute',
+              left: '-9999px',
+              width: '1px',
+              height: '1px',
+              opacity: 0,
+              visibility: 'hidden'
+            }}
+          />
+
           <div
             ref={dropZoneRef}
             onDrop={handleDrop}
@@ -155,19 +133,6 @@ const VideoUpload: React.FC<VideoUploadProps> = ({
               isDragOver ? 'active' : isUploading ? 'uploading' : ''
             }`}
           >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={supportedFormats.join(',')}
-              onChange={(e) => {
-                const files = e.target.files;
-                if (files && files.length > 0) {
-                  handleFileSelect(files[0]);
-                }
-              }}
-              className="hidden"
-            />
-
             {!isUploading ? (
               <div className="text-center space-y-6">
                 <div className={`text-6xl transition-all duration-300 ${
@@ -192,9 +157,9 @@ const VideoUpload: React.FC<VideoUploadProps> = ({
                   <button
                     onClick={openFileDialog}
                     className="btn btn-primary btn-xl"
+                    type="button"
                   >
-                    <span className="mr-2">📁</span>
-                    Select Video File
+                    📁 Select Video File
                   </button>
                   
                   <div className="text-sm text-gray-500 space-y-1">

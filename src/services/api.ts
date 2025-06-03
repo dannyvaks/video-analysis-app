@@ -77,7 +77,7 @@ class VideoAnalysisAPI {
   // Start video processing
   async processVideo(
     filePath: string,
-    mode: DetectionMode = 'micro_mobility_only',
+    mode: DetectionMode = DetectionMode.ALL_VEHICLES,
     frameSkip: number = 1
   ): Promise<{ message: string; status: string }> {
     const response = await fetch(`${API_BASE_URL}/video/process?file_path=${encodeURIComponent(filePath)}`, {
@@ -267,13 +267,13 @@ class VideoAnalysisAPI {
   async resumeAnalysis(
     videoFile: File,
     excelFile: File,
-    detectionMode: DetectionMode,
     modelConfidence: number
   ): Promise<any> {
     const formData = new FormData();
     formData.append('video_file', videoFile);
     formData.append('excel_file', excelFile);
-    formData.append('detection_mode', detectionMode);
+    // Use default detection mode since we removed mode selection
+    formData.append('detection_mode', DetectionMode.ALL_VEHICLES);
     formData.append('model_confidence', modelConfidence.toString());
 
     const response = await fetch(`${API_BASE_URL}/video/resume`, {
@@ -301,10 +301,10 @@ export const uploadVideoFile = async (file: File) => {
 
 export const startVideoProcessing = async (
   filename: string, 
-  detectionMode: DetectionMode = 'micro_mobility_only',
   frameSkip: number = 1
 ) => {
-  const result = await apiService.processVideo(filename, detectionMode, frameSkip);
+  // Use default detection mode since we removed mode selection
+  const result = await apiService.processVideo(filename, DetectionMode.ALL_VEHICLES, frameSkip);
   return result;
 };
 

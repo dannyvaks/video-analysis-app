@@ -110,7 +110,8 @@ class UniqueDetection:
     id: str
     timestamp: str
     frame_number: int
-    frame_image_data: str  # Base64 encoded
+    full_frame_image_data: str  # Base64 encoded full frame with bbox overlay
+    frame_image_data: str  # Base64 encoded fixed-size crop
     bbox: Dict
     model_suggestions: List[Dict]
     user_choice: Optional[str]
@@ -123,6 +124,7 @@ class UniqueDetection:
             "id": self.id,
             "timestamp": self.timestamp,
             "frameNumber": self.frame_number,
+            "fullFrameImageData": self.full_frame_image_data,
             "frameImageData": self.frame_image_data,
             "boundingBox": self.bbox,
             "modelSuggestions": self.model_suggestions,
@@ -443,8 +445,8 @@ class VideoProcessorService:
         # Calculate timestamp
         timestamp = self._frame_to_timestamp(frame_number, fps)
         
-        # Extract and encode frame region around detection
-        frame_image_data = self._extract_detection_frame(frame, detection)
+        # Extract both full frame with bbox and crop
+        full_frame_data, crop_image_data = self._extract_detection_images(frame, detection)
         
         # Generate model suggestions (top 3)
         model_suggestions = self._generate_model_suggestions(detection)
@@ -453,7 +455,8 @@ class VideoProcessorService:
             id=track_id,
             timestamp=timestamp,
             frame_number=frame_number,
-            frame_image_data=frame_image_data,
+            full_frame_image_data=full_frame_data,
+            frame_image_data=crop_image_data,
             bbox=detection.bbox.to_dict(),
             model_suggestions=model_suggestions,
             user_choice=None,
@@ -476,35 +479,110 @@ class VideoProcessorService:
         
         return f"{hours:02d}:{minutes:02d}:{seconds:06.3f}"
     
-    def _extract_detection_frame(self, frame: np.ndarray, detection: Detection) -> str:
-        """Extract and encode frame region around detection."""
+    def _extract_detection_images(self, frame: np.ndarray, detection: Detection) -> Tuple[str, str]:
+        """Extract full frame with bbox overlay and fixed-size crop."""
         try:
-            # Add padding around detection
-            padding = 50
-            x1 = max(0, int(detection.bbox.x - padding))
-            y1 = max(0, int(detection.bbox.y - padding))
-            x2 = min(frame.shape[1], int(detection.bbox.x + detection.bbox.width + padding))
-            y2 = min(frame.shape[0], int(detection.bbox.y + detection.bbox.height + padding))
+            # Create full frame with bounding box overlay
+            full_frame_with_bbox = self._create_full_frame_with_bbox(frame, detection)
+            full_frame_data = self._encode_image_to_base64(full_frame_with_bbox)
             
-            # Extract region
-            region = frame[y1:y2, x1:x2]
+            # Create fixed-size crop of detected object
+            crop_image = self._create_detection_crop(frame, detection, target_size=224)
+            crop_data = self._encode_image_to_base64(crop_image)
             
-            # Convert to RGB and resize if too large
-            region_rgb = cv2.cvtColor(region, cv2.COLOR_BGR2RGB)
-            if region_rgb.shape[0] > 300 or region_rgb.shape[1] > 300:
-                region_rgb = cv2.resize(region_rgb, (300, 300))
-            
-            # Convert to PIL Image and encode as base64
-            pil_image = Image.fromarray(region_rgb)
-            buffer = io.BytesIO()
-            pil_image.save(buffer, format='JPEG', quality=85)
-            
-            image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
-            return f"data:image/jpeg;base64,{image_data}"
+            return full_frame_data, crop_data
             
         except Exception as e:
-            logger.error(f"Failed to extract detection frame: {str(e)}")
-            return ""
+            logger.error(f"Failed to extract detection images: {str(e)}")
+            return "", ""
+    
+    def _create_full_frame_with_bbox(self, frame: np.ndarray, detection: Detection) -> np.ndarray:
+        """Create full frame with bounding box overlay."""
+        frame_with_bbox = frame.copy()
+        
+        # Extract bbox coordinates
+        x1, y1 = int(detection.bbox.x), int(detection.bbox.y)
+        x2, y2 = x1 + int(detection.bbox.width), y1 + int(detection.bbox.height)
+        
+        # Draw bounding box (bright green)
+        cv2.rectangle(frame_with_bbox, (x1, y1), (x2, y2), (0, 255, 0), 3)
+        
+        # Add label with class name and confidence
+        label = f"{detection.class_name}: {detection.confidence:.2f}"
+        label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
+        
+        # Draw label background
+        cv2.rectangle(frame_with_bbox, 
+                     (x1, y1 - label_size[1] - 10), 
+                     (x1 + label_size[0], y1), 
+                     (0, 255, 0), -1)
+        
+        # Draw label text
+        cv2.putText(frame_with_bbox, label, 
+                   (x1, y1 - 5), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+        
+        return frame_with_bbox
+    
+    def _create_detection_crop(self, frame: np.ndarray, detection: Detection, target_size: int = 224) -> np.ndarray:
+        """Create fixed-size crop of detected object."""
+        # Extract bbox coordinates with padding
+        bbox_area = detection.bbox.width * detection.bbox.height
+        padding_ratio = max(0.2, min(0.5, 5000 / bbox_area))  # Adaptive padding
+        
+        pad_w = detection.bbox.width * padding_ratio
+        pad_h = detection.bbox.height * padding_ratio
+        
+        x1 = max(0, int(detection.bbox.x - pad_w))
+        y1 = max(0, int(detection.bbox.y - pad_h))
+        x2 = min(frame.shape[1], int(detection.bbox.x + detection.bbox.width + pad_w))
+        y2 = min(frame.shape[0], int(detection.bbox.y + detection.bbox.height + pad_h))
+        
+        # Extract crop region
+        crop = frame[y1:y2, x1:x2]
+        
+        # Resize to fixed size while maintaining aspect ratio
+        h, w = crop.shape[:2]
+        if h == 0 or w == 0:
+            # Fallback to minimal crop if region is invalid
+            crop = frame[int(detection.bbox.y):int(detection.bbox.y + detection.bbox.height),
+                        int(detection.bbox.x):int(detection.bbox.x + detection.bbox.width)]
+            h, w = crop.shape[:2]
+        
+        if h > w:
+            new_h, new_w = target_size, int(w * target_size / h)
+        else:
+            new_h, new_w = int(h * target_size / w), target_size
+        
+        resized_crop = cv2.resize(crop, (new_w, new_h))
+        
+        # Center crop to exact target size
+        final_crop = np.zeros((target_size, target_size, 3), dtype=np.uint8)
+        y_offset = (target_size - new_h) // 2
+        x_offset = (target_size - new_w) // 2
+        final_crop[y_offset:y_offset + new_h, x_offset:x_offset + new_w] = resized_crop
+        
+        return final_crop
+    
+    def _encode_image_to_base64(self, image: np.ndarray, max_size: int = 800) -> str:
+        """Encode image to base64 with optional resizing."""
+        # Convert BGR to RGB
+        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        
+        # Resize if too large
+        h, w = image_rgb.shape[:2]
+        if max(h, w) > max_size:
+            scale = max_size / max(h, w)
+            new_w, new_h = int(w * scale), int(h * scale)
+            image_rgb = cv2.resize(image_rgb, (new_w, new_h))
+        
+        # Convert to PIL and encode
+        pil_image = Image.fromarray(image_rgb)
+        buffer = io.BytesIO()
+        pil_image.save(buffer, format='JPEG', quality=90)
+        
+        image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        return f"data:image/jpeg;base64,{image_data}"
     
     def _generate_model_suggestions(self, detection: Detection) -> List[Dict]:
         """Generate top 3 model suggestions for detection."""
