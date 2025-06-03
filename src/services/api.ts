@@ -74,12 +74,19 @@ class VideoAnalysisAPI {
     return response.json();
   }
 
-  // Start video processing
+  // Start video processing - now returns results directly like resume
   async processVideo(
     filePath: string,
     mode: DetectionMode = DetectionMode.ALL_VEHICLES,
     frameSkip: number = 1
-  ): Promise<{ message: string; status: string }> {
+  ): Promise<{
+    status: string;
+    message: string;
+    video: VideoMetadata;
+    detections: Detection[];
+    detection_mode: string;
+    frame_skip: number;
+  }> {
     const response = await fetch(`${API_BASE_URL}/video/process?file_path=${encodeURIComponent(filePath)}`, {
       method: 'POST',
       headers: {
@@ -305,7 +312,7 @@ export const startVideoProcessing = async (
 ) => {
   // Use default detection mode since we removed mode selection
   const result = await apiService.processVideo(filename, DetectionMode.ALL_VEHICLES, frameSkip);
-  return result;
+  return result; // Now returns full results including detections
 };
 
 export const submitUserChoice = async (

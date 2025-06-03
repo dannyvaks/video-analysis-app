@@ -11,7 +11,7 @@ from typing import List, Dict, Optional
 from contextlib import asynccontextmanager
 import shutil
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect, Form
+from fastapi import FastAPI, File, UploadFile, HTTPException, WebSocket, WebSocketDisconnect, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -140,19 +140,28 @@ class ConnectionManager:
     async def broadcast(self, message: dict):
         """Broadcast message to all connected clients."""
         if not self.active_connections:
+            logger.warning(f"📡 No active WebSocket connections to broadcast to")
             return
         
+        logger.info(f"📡 Broadcasting to {len(self.active_connections)} connections")
+        
         disconnected = []
-        for connection in self.active_connections:
+        for i, connection in enumerate(self.active_connections):
             try:
-                await connection.send_text(json.dumps(message))
+                message_json = json.dumps(message)
+                logger.info(f"📡 Sending to connection {i+1}: {len(message_json)} chars")
+                await connection.send_text(message_json)
+                logger.info(f"✅ Successfully sent to connection {i+1}")
             except Exception as e:
-                logger.error(f"Failed to send WebSocket message: {str(e)}")
+                logger.error(f"❌ Failed to send WebSocket message to connection {i+1}: {str(e)}")
+                logger.error(f"❌ Error type: {type(e).__name__}")
                 disconnected.append(connection)
         
         # Remove disconnected connections
         for connection in disconnected:
             self.disconnect(connection)
+            
+        logger.info(f"📡 Broadcast complete. Sent to {len(self.active_connections) - len(disconnected)}/{len(self.active_connections)} connections")
 
 manager = ConnectionManager()
 
@@ -252,11 +261,10 @@ async def upload_video(file: UploadFile = File(...)):
 
 @app.post("/video/process")
 async def process_video(
-    background_tasks: BackgroundTasks,
     request: ProcessingRequest,
     file_path: str
 ):
-    """Start video processing in the background."""
+    """Process video and return results directly (like resume)."""
     if not yolo_service or not yolo_service.is_loaded:
         raise HTTPException(status_code=503, detail="YOLOv8m model not loaded")
     
@@ -264,7 +272,9 @@ async def process_video(
         raise HTTPException(status_code=404, detail="Video file not found")
     
     try:
-        # Set up progress callback
+        logger.info(f"Starting synchronous video processing: {file_path}")
+        
+        # Set up progress callback for WebSocket updates
         async def progress_callback(progress_data):
             await manager.broadcast({
                 "type": "processing_progress",
@@ -273,47 +283,31 @@ async def process_video(
         
         video_processor.set_progress_callback(progress_callback)
         
-        # Start processing in background
-        background_tasks.add_task(
-            process_video_task,
-            file_path,
-            DetectionMode(request.detection_mode),
-            request.frame_skip
-        )
-        
-        return {"message": "Video processing started", "status": "processing"}
-        
-    except Exception as e:
-        logger.error(f"Failed to start video processing: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-async def process_video_task(file_path: str, detection_mode: DetectionMode, frame_skip: int):
-    """Background task for video processing."""
-    try:
-        logger.info(f"Starting video processing: {file_path}")
-        
-        # Process video
+        # Process video synchronously
         detections = await video_processor.process_video(
-            file_path, yolo_service, detection_mode, frame_skip
+            file_path, yolo_service, DetectionMode(request.detection_mode), request.frame_skip
         )
         
-        # Broadcast completion
-        await manager.broadcast({
-            "type": "processing_complete",
-            "data": {
-                "total_detections": len(detections),
-                "detections": [d.to_dict() for d in detections]
-            }
-        })
+        logger.info(f"🎉 Fresh processing complete: {len(detections)} detections")
         
-        logger.info(f"Video processing complete: {len(detections)} unique detections")
+        # Get video metadata
+        metadata = await video_processor.extract_metadata(file_path)
+        
+        # Return results directly like resume
+        return {
+            "status": "success",
+            "message": f"Video processing complete: {len(detections)} detections found",
+            "video": metadata.to_dict(),
+            "detections": [d.to_dict() for d in detections],
+            "detection_mode": request.detection_mode,
+            "frame_skip": request.frame_skip
+        }
         
     except Exception as e:
         logger.error(f"Video processing failed: {str(e)}")
-        await manager.broadcast({
-            "type": "processing_error",
-            "data": {"error": str(e)}
-        })
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 @app.post("/detection/choice")
 async def submit_detection_choice(choice: DetectionChoice):
@@ -518,16 +512,54 @@ async def resume_analysis(
         
         logger.info(f"📊 Parsing Excel file...")
         
+        # Shared function to generate consistent 3-suggestion format
+        def generate_model_suggestions(class_name: str, confidence: float) -> List[Dict]:
+            """Generate 3 model suggestions consistently for both fresh and resume processing"""
+            suggestions = [
+                {
+                    "type": class_name,
+                    "confidence": confidence
+                }
+            ]
+            
+            # Add alternative suggestions based on class similarity
+            similar_classes = {
+                'bicycle': ['motorcycle', 'electric_scooter'],
+                'motorcycle': ['bicycle', 'electric_motorcycle'], 
+                'car': ['truck', 'van'],
+                'truck': ['car', 'bus'],
+                'bus': ['truck', 'van']
+            }
+            
+            alternatives = similar_classes.get(class_name, ['car', 'motorcycle'])
+            for alt_class in alternatives[:2]:  # Top 2 alternatives
+                suggestions.append({
+                    "type": alt_class,
+                    "confidence": confidence * 0.8  # Lower confidence for alternatives
+                })
+            
+            # Ensure we always have exactly 3 suggestions
+            while len(suggestions) < 3:
+                suggestions.append({
+                    "type": "unknown",
+                    "confidence": confidence * 0.6
+                })
+            
+            return suggestions[:3]  # Return exactly 3
+        
         # Helper function to extract frame from video
         def extract_frame_images(video_path: str, frame_number: int, bbox: dict) -> tuple[str, str]:
             """Extract full frame with bbox overlay and crop image"""
             try:
+                logger.info(f"🖼️ Resume: Extracting frame {frame_number} with bbox {bbox}")
+                
                 cap = cv2.VideoCapture(video_path)
                 cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
                 ret, frame = cap.read()
                 cap.release()
                 
                 if not ret:
+                    logger.warning(f"⚠️ Could not read frame {frame_number}")
                     return "", ""
                 
                 # Create full frame with bounding box overlay
@@ -601,10 +633,12 @@ async def resume_analysis(
                 crop_b64 = base64.b64encode(buffer).decode('utf-8')
                 crop_data = f"data:image/jpeg;base64,{crop_b64}"
                 
+                logger.info(f"✅ Resume: Generated images - Full frame: {len(full_frame_data)} chars, Crop: {len(crop_data)} chars")
+                
                 return full_frame_data, crop_data
                 
             except Exception as e:
-                logger.warning(f"Failed to extract frame {frame_number}: {str(e)}")
+                logger.warning(f"❌ Resume: Failed to extract frame {frame_number}: {str(e)}")
                 return "", ""
         
         try:
@@ -765,10 +799,7 @@ async def resume_analysis(
                         "fullFrameImageData": full_frame_data,  # Full frame with bbox
                         "frameImageData": crop_data,  # 224x224 crop
                         "boundingBox": bbox,
-                        "modelSuggestions": [{
-                            "type": str(object_type),
-                            "confidence": float(confidence)
-                        }],
+                        "modelSuggestions": generate_model_suggestions(str(object_type), float(confidence)),
                         "userChoice": str(user_choice) if pd.notna(user_choice) and str(user_choice).lower() not in ['', 'none', 'nan', 'not reviewed'] else None,
                         "isManualLabel": str(manual_label).lower() == 'yes',
                         "isManualCorrection": str(manual_correction).lower() == 'yes',

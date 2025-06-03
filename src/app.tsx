@@ -231,15 +231,28 @@ const App: React.FC = () => {
         }
       }));
 
-      // Start processing with backend
-      await startVideoProcessing(filePath, 30);
-
-      console.log('✅ Video processing started');
+      // Process video and get results directly (like resume)
+      console.log('🚀 Starting video processing...');
+      const result = await startVideoProcessing(filePath, 30);
+      console.log('🎉 Processing complete, got results:', result);
+      
+      // Handle results directly like resume does
+      setAppState(prev => ({
+        ...prev,
+        detections: result.detections || [],
+        currentStep: 'review',
+        isProcessing: false,
+        processingProgress: null
+      }));
+      
+      console.log(`✅ Fresh processing complete with ${result.detections?.length || 0} detections`);
       
     } catch (err) {
+      console.error('❌ Video processing failed:', err);
+      
       const error: AppError = {
         code: 'VIDEO_PROCESSING_FAILED',
-        message: 'Failed to start video processing',
+        message: 'Failed to process video',
         details: err,
         timestamp: new Date().toISOString(),
         recoverable: true

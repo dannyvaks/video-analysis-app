@@ -442,14 +442,19 @@ class VideoProcessorService:
                                       fps: float,
                                       track_id: str):
         """Create unique detection entry for user review."""
+        logger.info(f"🎯 Fresh: Creating unique detection for {detection.class_name} at frame {frame_number}")
+        
         # Calculate timestamp
         timestamp = self._frame_to_timestamp(frame_number, fps)
         
         # Extract both full frame with bbox and crop
+        logger.info(f"🖼️ Fresh: About to extract images for {detection.class_name}")
         full_frame_data, crop_image_data = self._extract_detection_images(frame, detection)
+        logger.info(f"🖼️ Fresh: Image extraction complete - Full: {len(full_frame_data)} chars, Crop: {len(crop_image_data)} chars")
         
         # Generate model suggestions (top 3)
         model_suggestions = self._generate_model_suggestions(detection)
+        logger.info(f"🤖 Fresh: Generated {len(model_suggestions)} suggestions")
         
         unique_detection = UniqueDetection(
             id=track_id,
@@ -467,8 +472,7 @@ class VideoProcessorService:
         
         self.unique_detections.append(unique_detection)
         
-        logger.debug(f"Created unique detection: {detection.class_name} "
-                    f"at frame {frame_number}")
+        logger.info(f"✅ Fresh: Created unique detection with full_frame_data: {len(full_frame_data) > 0}, crop_data: {len(crop_image_data) > 0}")
     
     def _frame_to_timestamp(self, frame_number: int, fps: float) -> str:
         """Convert frame number to timestamp string."""
@@ -482,6 +486,8 @@ class VideoProcessorService:
     def _extract_detection_images(self, frame: np.ndarray, detection: Detection) -> Tuple[str, str]:
         """Extract full frame with bbox overlay and fixed-size crop."""
         try:
+            logger.info(f"🖼️ Extracting images for detection: {detection.class_name} at ({detection.bbox.x}, {detection.bbox.y})")
+            
             # Create full frame with bounding box overlay
             full_frame_with_bbox = self._create_full_frame_with_bbox(frame, detection)
             full_frame_data = self._encode_image_to_base64(full_frame_with_bbox)
@@ -490,10 +496,12 @@ class VideoProcessorService:
             crop_image = self._create_detection_crop(frame, detection, target_size=224)
             crop_data = self._encode_image_to_base64(crop_image)
             
+            logger.info(f"✅ Generated images - Full frame: {len(full_frame_data)} chars, Crop: {len(crop_data)} chars")
+            
             return full_frame_data, crop_data
             
         except Exception as e:
-            logger.error(f"Failed to extract detection images: {str(e)}")
+            logger.error(f"❌ Failed to extract detection images: {str(e)}")
             return "", ""
     
     def _create_full_frame_with_bbox(self, frame: np.ndarray, detection: Detection) -> np.ndarray:
@@ -586,8 +594,6 @@ class VideoProcessorService:
     
     def _generate_model_suggestions(self, detection: Detection) -> List[Dict]:
         """Generate top 3 model suggestions for detection."""
-        # For now, return the detected class with variations
-        # In a real implementation, you might use multiple models or confidence variations
         suggestions = [
             {
                 "type": detection.class_name,
@@ -603,7 +609,14 @@ class VideoProcessorService:
                 "confidence": detection.confidence * 0.8  # Lower confidence for alternatives
             })
         
-        return suggestions
+        # Ensure we always have exactly 3 suggestions
+        while len(suggestions) < 3:
+            suggestions.append({
+                "type": "unknown",
+                "confidence": detection.confidence * 0.6
+            })
+        
+        return suggestions[:3]  # Return exactly 3
     
     def _get_similar_classes(self, class_name: str) -> List[str]:
         """Get similar vehicle classes for suggestions."""

@@ -37,7 +37,8 @@ export interface Detection {
   id: string;
   timestamp: string;
   frameNumber: number;
-  frameImageData: string;
+  fullFrameImageData?: string;  // Full frame with bbox overlay
+  frameImageData: string;       // 224x224 crop
   boundingBox: BoundingBox;
   modelSuggestions: ModelSuggestion[];
   userChoice?: string | null;
