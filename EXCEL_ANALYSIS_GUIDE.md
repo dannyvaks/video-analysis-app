@@ -48,8 +48,8 @@ This is the main data sheet containing every unique detection found in your vide
 | **Bbox Y** | Top edge of detection box (pixels) | `156` | Vertical position |
 | **Bbox Width** | Width of detection box (pixels) | `120` | Object width |
 | **Bbox Height** | Height of detection box (pixels) | `89` | Object height |
-| **Manual Correction** | Was AI prediction corrected? | `Yes`, `No` | Quality control flag |
-| **Manual Label** | Was this manually added? | `Yes`, `No` | Human-added detection |
+| **Manual Correction** | Was a different AI suggestion chosen? | `Yes`, `No` | User chose different AI option (not top choice) |
+| **Manual Label** | Was this a custom input or non-AI choice? | `Yes`, `No` | Custom text or choice not in current AI suggestions |
 | **Processed At** | When analysis was completed | `2024-12-03 14:30:22` | Processing timestamp |
 
 ### **Example Detection Data**
@@ -66,6 +66,46 @@ Manual Correction: No
 ```
 
 **What this means:** At 41.567 seconds into the video, the AI detected a car with 87% confidence at position (245,156) with size 120×89 pixels. The human reviewer agreed it was a car.
+
+### **🎨 Enhanced Visual Indicators & Excel Data Consistency**
+
+The application now features enhanced visual indicators that are accurately reflected in Excel exports:
+
+#### **📊 Manual Correction vs Manual Label Logic**
+
+**🟠 Manual Correction (Orange):**
+- **Definition**: User chose a different AI suggestion (not the top choice)
+- **Excel**: Manual Correction = "Yes", Manual Label = "No"
+- **Example**: AI suggests ["car", "truck", "bus"], user chooses "truck"
+
+**🟣 Manual Label (Purple):**
+- **Definition**: Custom user input OR choice not in current AI suggestions  
+- **Excel**: Manual Label = "Yes", Manual Correction = "No"
+- **Examples**: 
+  - User types "electric scooter"
+  - Resume case: User previously chose "taxi", but current AI suggests ["car", "bike"]
+
+**🟢 AI Accepted (Green):**
+- **Definition**: User accepted the top AI suggestion
+- **Excel**: Manual Correction = "No", Manual Label = "No"
+- **Example**: AI suggests ["car", "truck", "bus"], user chooses "car"
+
+#### **📈 Excel Export Accuracy**
+
+| User Action | Choice | Manual Label | Manual Correction | Visual Indicator |
+|-------------|--------|--------------|-------------------|-----------------|
+| **Types "electric scooter"** | electric scooter | **Yes** | No | 🟣 Purple |
+| **AI: ["car","truck"], picks "truck"** | truck | No | **Yes** | 🟠 Orange |
+| **AI: ["car","truck"], picks "car"** | car | No | No | 🟢 Green |
+| **Resume: "taxi", AI: ["car","bike"]** | taxi | **Yes** | No | 🟣 Purple |
+
+#### **🔄 Resume Functionality Impact**
+
+When resuming from Excel exports, the visual indicators are accurately restored based on the Excel data:
+- **Manual Label = "Yes"** → 🟣 Purple indicator
+- **Manual Correction = "Yes"** → 🟠 Orange indicator  
+- **Both = "No"** → 🟢 Green indicator
+- **No User Choice** → ⚪ Gray indicator
 
 ---
 
@@ -105,8 +145,9 @@ Car_Percentage = (Car_Count / Total_Detections) × 100
 ```
 Calculation Example:
 ├── Total AI Predictions: 247
-├── Human Agreed (No Correction): 198  
-├── Human Disagreed (Manual Correction): 49
+├── Human Agreed (AI Accepted - Green): 198  
+├── Human Chose Different AI Option (Manual Correction - Orange): 32
+├── Human Used Custom/Non-AI Choice (Manual Label - Purple): 17
 └── AI Accuracy: 198/247 = 80.2%
 ```
 
@@ -404,15 +445,23 @@ This suggests significant bicycle commuting activity
 **Look for:**
 - Overall AI accuracy percentage
 - Confidence distribution
-- Manual correction rates
+- Manual correction vs manual label rates
+- Visual indicator breakdown
 
-**Example interpretation:**
+**Enhanced interpretation with visual indicators:**
 ```
 Overall Accuracy: 87%
 High Confidence (>80%): 78% of detections
-Manual Corrections: 13% of detections
-The AI is highly reliable for this video type
+🟢 AI Accepted (Green): 74% of detections
+🟠 Manual Corrections (Orange): 13% of detections  
+🟣 Manual Labels (Purple): 13% of detections
+The AI is highly reliable, with most corrections being re-ranking rather than completely new categories
 ```
+
+**Key insights from corrected data:**
+- **Low Orange %**: AI suggestions are generally good, users just prefer different rankings
+- **High Purple %**: Users frequently identify vehicle types the AI doesn't recognize
+- **High Green %**: AI top suggestions are trusted by users
 
 ### **Infrastructure Planning**
 
@@ -593,8 +642,11 @@ Before drawing conclusions:
 - ✅ Watch sample video segments to verify detection quality
 - ✅ Check if AI predictions match your visual assessment  
 - ✅ Verify vehicle type classifications make sense
+- ✅ **Verify Manual Correction vs Manual Label columns are accurate**
+- ✅ **Check visual indicator consistency when resuming from Excel**
 - ✅ Look for systematic biases (e.g., missing small objects)
 - ✅ Compare results with manual counts on short segments
+- ✅ **Ensure Orange indicators represent AI re-ranking, Purple represents new categories**
 
 ---
 

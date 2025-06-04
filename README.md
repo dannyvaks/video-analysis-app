@@ -6,11 +6,13 @@ A production-ready video analysis application for detecting and classifying vehi
 
 - 🎯 **High-Accuracy Detection**: YOLOv8m model with 88% F1 score for vehicle detection
 - 🚗 **Dual Detection Views**: Full frame context + detailed crops for precise review
+- 🎨 **Enhanced Visual Indicators**: Color-coded choice tracking with real-time feedback
 - ⚡ **GPU Acceleration**: CUDA support for 15-25 FPS processing speed
 - 📊 **Smart Deduplication**: Object tracking reduces review workload by 85-90%
 - 📈 **Comprehensive Reports**: Excel exports with statistics, charts, and frame images
-- 🔄 **Resume Analysis**: Continue work from previous Excel exports
+- 🔄 **Resume Analysis**: Continue work from previous Excel exports with preserved visual state
 - 🌐 **Real-time Progress**: WebSocket progress tracking during processing
+- 🗺️ **Intelligent Navigation**: Color-coded detection grid with status at a glance
 
 ---
 
@@ -35,8 +37,45 @@ A production-ready video analysis application for detecting and classifying vehi
 **Processing Flow:**
 1. **Upload** → Video file via HTTP
 2. **Process** → YOLOv8m detection + tracking
-3. **Review** → Full frame + crop dual view  
+3. **Review** → Full frame + crop dual view with visual feedback
 4. **Export** → Excel with charts + statistics
+
+---
+
+## 🎨 **Enhanced Visual Indicators System**
+
+The application features an advanced visual feedback system that provides real-time indication of user choices:
+
+### **🏷️ Visual Color System**
+- **🟢 Green (AI Accepted)**: User accepted the top AI suggestion
+- **🟠 Orange (Manual Correction)**: User chose a different AI suggestion (not the top choice)
+- **🟣 Purple (Manual Label)**: User entered custom text OR choice not in current AI suggestions
+- **⚪ Gray (Unreviewed)**: Detection not yet reviewed by user
+- **🔵 Blue (Current)**: Currently active detection being reviewed
+
+### **🎯 Logic Examples**
+```
+🟢 Green Example:
+- AI suggests: ["car" (top), "truck", "bus"]
+- User chooses: "car"
+- Result: Green indicator (accepted top AI suggestion)
+
+🟠 Orange Example: 
+- AI suggests: ["car" (top), "truck", "bus"]
+- User chooses: "truck"
+- Result: Orange indicator (chose different AI suggestion)
+
+🟣 Purple Examples:
+- User types custom: "electric scooter"
+- Resume case: User previously chose "taxi", but current AI suggests ["car", "bike"]
+- Result: Purple indicator (custom input or not in current AI suggestions)
+```
+
+### **🗺️ Navigation Benefits**
+- **Instant Status**: See review progress at a glance in navigation grid
+- **Resume Continuity**: Visual state preserved when resuming from Excel exports
+- **Quality Tracking**: Distinguish between AI accepted vs manual corrections vs custom labels
+- **Progress Visualization**: Multi-segment progress bar showing choice type breakdown
 
 ---
 
@@ -385,8 +424,10 @@ video-analysis-app/
 │   └── 📋 requirements.txt          # Python Dependencies
 ├── 📁 src/                          # React TypeScript Frontend
 │   ├── 📁 components/               # UI Components
-│   │   ├── 🎯 DetectionReview.tsx   # Main Review Interface
+│   │   ├── 🎨 EnhancedDetectionReview.tsx # Enhanced Review Interface with Visual Indicators
+│   │   ├── 🎯 DetectionReview.tsx   # Legacy Review Interface (preserved)
 │   │   ├── 📹 VideoUpload.tsx       # Upload Component
+│   │   ├── 🔄 ResumeAnalysis.tsx    # Resume from Excel Component
 │   │   └── 📊 StatisticsPanel.tsx   # Results Statistics
 │   ├── 📁 services/                 # API Communication
 │   │   └── 🌐 api.ts                # Backend API Client
