@@ -12,7 +12,7 @@ import {
 import Header from './components/Header';
 import VideoUpload from './components/VideoUpload';
 import VideoPlayer from './components/VideoPlayer';
-import DetectionReview from './components/DetectionReview';
+import EnhancedDetectionReview from './components/EnhancedDetectionReview';
 import StatisticsPanel from './components/StatisticsPanel';
 import ExportInterface from './components/ExportInterface';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -274,7 +274,8 @@ const App: React.FC = () => {
           ? { 
               ...detection, 
               userChoice: choice.selectedType, 
-              isManualCorrection: choice.isManual 
+              isManualLabel: choice.isManual,
+              isManualCorrection: choice.isManualCorrection
             }
           : detection
       );
@@ -584,8 +585,8 @@ const App: React.FC = () => {
                 </p>
               </div>
 
-              {/* Main Detection Review - FIXED: Full width layout */}
-              <DetectionReview
+              {/* Main Detection Review - Enhanced with Visual Indicators */}
+              <EnhancedDetectionReview
                 detections={appState.detections}
                 currentIndex={appState.currentDetectionIndex}
                 onDetectionChoice={handleDetectionChoice}
