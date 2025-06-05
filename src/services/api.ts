@@ -295,6 +295,87 @@ class VideoAnalysisAPI {
 
     return response.json();
   }
+
+  async resumeAnalysisFromExisting(
+    videoFilename: string,
+    excelFilename: string,
+    modelConfidence: number
+  ): Promise<any> {
+    console.log('🔄 API: resumeAnalysisFromExisting called with:', { videoFilename, excelFilename, modelConfidence });
+    
+    const formData = new FormData();
+    formData.append('video_filename', videoFilename);
+    formData.append('excel_filename', excelFilename);
+    formData.append('detection_mode', DetectionMode.ALL_VEHICLES);
+    formData.append('model_confidence', modelConfidence.toString());
+
+    console.log('🔄 API: Calling /video/resume-existing endpoint');
+    
+    const response = await fetch(`${API_BASE_URL}/video/resume-existing`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Resume analysis from existing failed');
+    }
+
+    return response.json();
+  }
+
+  // File management endpoints
+  async listVideoFiles(): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/files/videos`);
+    if (!response.ok) {
+      throw new Error('Failed to list video files');
+    }
+    return response.json();
+  }
+
+  async listExcelFiles(): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/files/excel`);
+    if (!response.ok) {
+      throw new Error('Failed to list Excel files');
+    }
+    return response.json();
+  }
+
+  async listFilePairs(): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/files/pairs`);
+    if (!response.ok) {
+      throw new Error('Failed to list file pairs');
+    }
+    return response.json();
+  }
+
+  async getStorageStats(): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/files/stats`);
+    if (!response.ok) {
+      throw new Error('Failed to get storage stats');
+    }
+    return response.json();
+  }
+
+  async cleanupOldFiles(dryRun: boolean = true): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/files/cleanup?dry_run=${dryRun}`, {
+      method: 'POST'
+    });
+    if (!response.ok) {
+      throw new Error('Failed to cleanup files');
+    }
+    return response.json();
+  }
+
+  async deleteFile(filePath: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/files/${encodeURIComponent(filePath)}`, {
+      method: 'DELETE'
+    });
+    if (!response.ok) {
+      throw new Error('Failed to delete file');
+    }
+    return response.json();
+  }
 }
 
 // Create singleton instance

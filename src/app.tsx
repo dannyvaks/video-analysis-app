@@ -17,7 +17,7 @@ import StatisticsPanel from './components/StatisticsPanel';
 import ExportInterface from './components/ExportInterface';
 import ErrorBoundary from './components/ErrorBoundary';
 import ModelLoader from './components/ModelLoader';
-import ResumeAnalysis from './components/ResumeAnalysis';
+import EnhancedResumeAnalysis from './components/EnhancedResumeAnalysis';
 
 // Import API service
 import { apiService, uploadVideoFile, startVideoProcessing } from './services/api';
@@ -635,7 +635,7 @@ const App: React.FC = () => {
       </main>
 
       {/* Resume Modal */}
-      <ResumeAnalysis
+      <EnhancedResumeAnalysis
         isVisible={showResumeModal}
         onClose={() => setShowResumeModal(false)}
         onResumeSuccess={handleResumeSuccess}
