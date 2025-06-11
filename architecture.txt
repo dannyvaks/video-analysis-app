@@ -199,11 +199,77 @@ Add charts and metadata → Download file
 - **False Positive Handling**: User can correct/override any detection
 
 ### **System Scalability**
-- **Video Size**: Up to 500MB per upload
+- **Video Size**: Up to 2GB per upload (configurable)
 - **Concurrent Users**: Designed for multiple simultaneous analyses
 - **Storage Management**: Automatic cleanup of old files
 
 ## 🔧 Configuration & Deployment
+
+### **File Size Configuration**
+
+To support larger video files in the future, update these locations:
+
+#### **Frontend File Size Limits**
+```typescript
+// File: src/components/VideoUpload.tsx (Line ~18)
+const maxFileSize = 2 * 1024 * 1024 * 1024; // 2GB
+
+// Change to support larger files:
+const maxFileSize = 5 * 1024 * 1024 * 1024; // 5GB example
+```
+
+#### **Backend Configuration**
+```python
+# File: backend/config.py (Line ~25)
+max_video_size_mb: int = Field(default=2048, description="Maximum video file size in MB")
+
+# Change to support larger files:
+max_video_size_mb: int = Field(default=5120, description="Maximum video file size in MB") # 5GB
+```
+
+#### **Environment Variables**
+```env
+# File: .env
+VITE_MAX_UPLOAD_SIZE=2147483648  # 2GB in bytes
+
+# Change to support larger files:
+VITE_MAX_UPLOAD_SIZE=5368709120  # 5GB in bytes
+```
+
+#### **Documentation Updates**
+```markdown
+# File: README.md - Update these sections:
+# 1. Performance table (Line ~130)
+# 2. Environment examples (Line ~315)
+# 3. Configuration examples (Line ~300)
+```
+
+#### **Server Configuration Considerations**
+
+For files larger than 2GB, also consider:
+
+```python
+# FastAPI/Uvicorn may need configuration for large uploads
+# Add to main.py if needed:
+app.add_middleware(
+    LimitUploadSizeMiddleware, 
+    max_upload_size=5 * 1024 * 1024 * 1024  # 5GB
+)
+```
+
+```nginx
+# NGINX reverse proxy configuration (if used):
+client_max_body_size 5G;
+proxy_read_timeout 300s;
+proxy_send_timeout 300s;
+```
+
+#### **Performance Impact of Larger Files**
+- **Memory Usage**: Larger files require more RAM for processing
+- **Processing Time**: Linear increase with file size
+- **Network Transfer**: Longer upload times on slower connections
+- **Storage Requirements**: Ensure adequate disk space
+- **GPU Memory**: Very large videos may need chunked processing
 
 ### **Environment Configuration**
 ```bash
@@ -250,6 +316,7 @@ REACT_APP_API_URL=http://localhost:8000
 
 ### **Planned Features**
 - **Batch Processing**: Multiple videos simultaneously
+- **Larger File Support**: 5GB+ videos with chunked processing
 - **Custom Model Training**: User-provided datasets
 - **Advanced Analytics**: Temporal analysis, heat maps
 - **API Integration**: Third-party traffic management systems
@@ -265,6 +332,7 @@ REACT_APP_API_URL=http://localhost:8000
 ### **Technical KPIs**
 - **Processing Speed**: <500ms per frame on GPU
 - **Accuracy**: 88%+ F1 score maintained
+- **File Support**: Up to 2GB video uploads
 - **Uptime**: 99.9% service availability
 - **User Experience**: <30s initial load time
 

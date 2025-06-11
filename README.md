@@ -128,7 +128,7 @@ Frontend runs at: `http://localhost:3000`
 |-----------|----------|---------|-------------|
 | **Frame Skip** | `app.tsx:267` | `30` | Process every Nth frame (1=all frames, 30=every 30th) |
 | **Detection Mode** | `api.ts:82` | `ALL_VEHICLES` | `MICRO_MOBILITY_ONLY` or `ALL_VEHICLES` |
-| **Max File Size** | `VideoUpload.tsx:17` | `500MB` | Maximum upload file size |
+| **Max File Size** | `VideoUpload.tsx:17` | `2GB` | Maximum upload file size |
 | **Supported Formats** | `VideoUpload.tsx:16` | `['.mp4', '.avi', '.mov', '.mkv']` | Allowed video formats |
 
 **To change frame skip rate:**
@@ -297,7 +297,7 @@ SERVER_PORT=8000
 SERVER_RELOAD=true
 
 # Storage Settings
-MAX_FILE_SIZE_MB=500
+MAX_FILE_SIZE_MB=2048
 AUTO_DELETE_DAYS=7
 UPLOAD_DIR=uploads
 EXPORT_DIR=exports
@@ -311,7 +311,7 @@ MAX_CONCURRENT_PROCESSING=2
 ```env
 VITE_API_URL=http://localhost:8000
 VITE_WS_URL=ws://localhost:8000
-VITE_MAX_UPLOAD_SIZE=524288000
+VITE_MAX_UPLOAD_SIZE=2147483648
 VITE_SUPPORTED_FORMATS=.mp4,.avi,.mov,.mkv
 ```
 

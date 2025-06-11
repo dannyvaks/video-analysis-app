@@ -16,7 +16,7 @@ const VideoUpload: React.FC<VideoUploadProps> = ({
   const dropZoneRef = useRef<HTMLDivElement>(null);
 
   const supportedFormats = ['.mp4', '.avi', '.mov', '.mkv'];
-  const maxFileSize = 500 * 1024 * 1024; // 500MB
+  const maxFileSize = 2 * 1024 * 1024 * 1024; // 2GB
 
   const formatFileSize = (bytes: number): string => {
     const units = ['B', 'KB', 'MB', 'GB'];

@@ -23,7 +23,7 @@ class VideoProcessingConfig(BaseSettings):
     distance_threshold: float = Field(default=50.0, description="Distance threshold for tracking")
     max_missing_frames: int = Field(default=10, description="Max frames an object can be missing")
     frame_skip_default: int = Field(default=1, description="Default frame skip value")
-    max_video_size_mb: int = Field(default=500, description="Maximum video file size in MB")
+    max_video_size_mb: int = Field(default=2048, description="Maximum video file size in MB")
     
     class Config:
         env_prefix = "VIDEO_"
